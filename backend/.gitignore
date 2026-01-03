@@ -1,0 +1,56 @@
+# Environment variables (keep .env.example for reference)
+.env
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Virtual environment
+venv/
+env/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs
+*.log
+
+# Data and output files
+data/*.txt
+data/*.csv
+!data/task_sequence.csv
+!data/task_sequence_main.csv
+data/uploads/
+data/exports/
+
+# ML Models (large files)
+ml_models/*.pt
+ml_models/*.pth
+ml_models/*.onnx
+!ml_models/README.md
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Backup files
+main_old.py
+*_backup.*
+*_old.*
