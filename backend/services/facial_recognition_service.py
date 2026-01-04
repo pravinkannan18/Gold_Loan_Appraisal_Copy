@@ -17,12 +17,25 @@ try:
     import insightface
     from insightface.app import FaceAnalysis
     FACE_RECOGNITION_AVAILABLE = True
-    print("Face recognition libraries loaded successfully")
+    print("✅ Face recognition libraries loaded successfully")
 except ImportError as e:
-    print(f"Face recognition libraries not available: {e}")
-    print("Install with: pip install insightface onnxruntime")
+    print(f"❌ Face recognition libraries not available: {e}")
+    print(f"   Full error details: {type(e).__name__}: {str(e)}")
+    print("   Install with: pip install insightface onnxruntime")
     FACE_RECOGNITION_AVAILABLE = False
     # Mock classes for development
+    class FaceAnalysis:
+        def __init__(self, **kwargs):
+            pass
+        def prepare(self, **kwargs):
+            pass
+        def get(self, img):
+            return []
+except Exception as e:
+    print(f"❌ Unexpected error loading face recognition: {type(e).__name__}: {e}")
+    import traceback
+    traceback.print_exc()
+    FACE_RECOGNITION_AVAILABLE = False
     class FaceAnalysis:
         def __init__(self, **kwargs):
             pass

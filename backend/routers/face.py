@@ -1,5 +1,6 @@
 """Facial Recognition API routes"""
-from fastapi import APIRouter, Form
+from fastapi import APIRouter, Form, HTTPException
+import traceback
 
 router = APIRouter(prefix="/api/face", tags=["facial-recognition"])
 
@@ -17,14 +18,28 @@ async def register_face(
     image: str = Form(...)
 ):
     """Register a new face for facial recognition"""
-    result = facial_service.register_face(name, appraiser_id, image)
-    return result
+    try:
+        result = facial_service.register_face(name, appraiser_id, image)
+        return result
+    except Exception as e:
+        print(f"Error in register_face endpoint: {e}")
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/recognize")
 async def recognize_face(image: str = Form(...)):
     """Recognize a face from image"""
-    result = facial_service.recognize_face(image)
-    return result
+    try:
+        if facial_service is None:
+            raise HTTPException(status_code=500, detail="Facial service not initialized")
+        result = facial_service.recognize_face(image)
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error in recognize_face endpoint: {e}")
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/appraisers")
 async def get_registered_appraisers():
