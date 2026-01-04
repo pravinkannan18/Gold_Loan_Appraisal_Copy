@@ -42,12 +42,21 @@ app = FastAPI(
 # CORS Middleware
 # ============================================================================
 
+# Allow both local development and production origins
+origins = [
+    "http://localhost:5173",
+    "http://localhost:3000",
+    "https://embsys.netlify.app",
+    "https://*.netlify.app",  # Allow all Netlify preview domains
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"],
     expose_headers=["*"],
     max_age=3600,
 )
