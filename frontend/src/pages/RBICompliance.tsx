@@ -410,75 +410,64 @@ export function RBICompliance() {
   };
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-blue-50 via-indigo-50 to-sky-100 dark:from-slate-950 dark:via-slate-900 dark:to-blue-950">
-      {/* Enhanced background with animated gradients */}
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_800px_600px_at_50%_-200px,_rgba(59,130,246,0.15),_transparent),_radial-gradient(ellipse_600px_400px_at_80%_100%,_rgba(99,102,241,0.12),_transparent)]" />
-      <div className="absolute inset-0 bg-gradient-to-br from-white/60 via-transparent to-blue-50/40 dark:from-slate-950/80 dark:via-slate-900/60 dark:to-blue-950/80" />
+    <div className="relative min-h-screen overflow-hidden">
+      {/* Premium Animated Background */}
+      <div className="absolute inset-0 bg-gradient-to-br from-blue-50 via-indigo-50/50 to-violet-50/30 dark:from-slate-950 dark:via-blue-950/50 dark:to-violet-950/30" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_40%,_rgba(59,130,246,0.1),_transparent_50%),_radial-gradient(circle_at_70%_70%,_rgba(99,102,241,0.08),_transparent_50%),_radial-gradient(circle_at_50%_10%,_rgba(139,92,246,0.06),_transparent_40%)] animate-pulse" style={{ animationDuration: '8s' }} />
+      <div className="absolute inset-0 backdrop-blur-3xl bg-white/40 dark:bg-slate-900/40" />
       
-      {/* Floating decorative elements */}
-      <div className="absolute top-20 left-10 w-20 h-20 bg-gradient-to-br from-blue-400/20 to-indigo-500/20 rounded-full blur-xl animate-pulse" />
-      <div className="absolute top-40 right-20 w-32 h-32 bg-gradient-to-br from-indigo-400/15 to-sky-500/15 rounded-full blur-2xl animate-pulse delay-1000" />
-      <div className="absolute bottom-20 left-1/4 w-24 h-24 bg-gradient-to-br from-sky-400/20 to-blue-500/20 rounded-full blur-xl animate-pulse delay-2000" />
+      {/* Premium Floating Orbs */}
+      <div className="absolute top-20 left-10 w-72 h-72 bg-blue-400/20 dark:bg-blue-500/10 rounded-full blur-3xl animate-pulse" style={{ animationDuration: '6s' }} />
+      <div className="absolute bottom-20 right-10 w-96 h-96 bg-indigo-400/20 dark:bg-indigo-500/10 rounded-full blur-3xl animate-pulse" style={{ animationDuration: '8s', animationDelay: '2s' }} />
       
       <div className="relative z-10">
         <StepIndicator currentStep={3} />
 
-        <div className="mx-auto max-w-7xl px-6 py-12">
-          <div className="overflow-hidden rounded-3xl border border-white/20 bg-white/80 backdrop-blur-2xl shadow-2xl shadow-blue-500/10 dark:border-slate-700/30 dark:bg-slate-900/70">
-            {/* Enhanced header with gradient and icons */}
-            <div className="relative bg-gradient-to-r from-blue-600 via-indigo-600 to-sky-600 px-10 py-8">
-              <div className="absolute inset-0 bg-gradient-to-r from-blue-600/90 via-indigo-600/90 to-sky-600/90" />
-              <div className="absolute top-0 left-0 w-full h-full opacity-10">
-                <div className="grid grid-cols-12 gap-2 h-full">
-                  {Array.from({ length: 48 }).map((_, i) => (
-                    <div key={i} className="w-1 h-1 bg-white rounded-full opacity-30" />
-                  ))}
-                </div>
-              </div>
+        {/* Full Width Premium Layout */}
+        <div className="min-h-[calc(100vh-120px)]">
+          <div className="h-full bg-gradient-to-br from-white/95 via-white/90 to-blue-50/80 backdrop-blur-2xl dark:from-slate-900/95 dark:via-slate-900/90 dark:to-blue-950/80">
+            
+            {/* Premium Header with Gradient Overlay - Full Width */}
+            <div className="relative overflow-hidden bg-gradient-to-br from-blue-600 via-indigo-600 to-violet-700 px-8 py-8">
+              {/* Animated Background Pattern */}
+              <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxwYXRoIGQ9Ik0zNiAxOGMzLjMxNCAwIDYgMi42ODYgNiA2cy0yLjY4NiA2LTYgNi02LTIuNjg2LTYtNiAyLjY4Ni02IDYtNnptMCAwYzMuMzE0IDAgNiAyLjY4NiA2IDZzLTIuNjg2IDYtNiA2LTYtMi42ODYtNi02IDIuNjg2LTYgNi02eiIgc3Ryb2tlPSJyZ2JhKDI1NSwyNTUsMjU1LDAuMSkiIHN0cm9rZS13aWR0aD0iMSIvPjwvZz48L3N2Zz4=')] opacity-20" />
+              <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-white/10 to-transparent rounded-full blur-3xl" />
               
-              <div className="relative flex flex-wrap items-center gap-6">
-                <div className="flex items-center gap-4">
-                  <div className="relative rounded-2xl bg-white/20 p-4 shadow-lg backdrop-blur-sm">
-                    <Shield className="h-10 w-10 text-white" />
-                    <div className="absolute -top-1 -right-1 rounded-full bg-yellow-400 p-1">
-                      <CheckCircle className="h-3 w-3 text-white" />
+              <div className="container mx-auto max-w-7xl">
+                <div className="relative flex flex-wrap items-center gap-4">
+                  <div className="group/icon relative">
+                    <div className="absolute inset-0 bg-white/30 rounded-2xl blur-xl" />
+                    <div className="relative rounded-2xl bg-white/20 p-3 shadow-2xl backdrop-blur-sm border border-white/30 transition-all duration-300 group-hover/icon:scale-110 group-hover/icon:bg-white/30">
+                      <Shield className="h-8 w-8 text-white drop-shadow-lg" />
                     </div>
                   </div>
-                </div>
-                
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Sparkles className="h-4 w-4 text-yellow-300" />
-                    <p className="text-sm font-medium uppercase tracking-[0.3em] text-blue-100">
-                      RBI Compliance Image
-                    </p>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <div className="h-1 w-1 rounded-full bg-white/60 animate-pulse" />
+                      <p className="text-xs font-semibold uppercase tracking-[0.25em] text-white/90">RBI Compliance Documentation</p>
+                    </div>
+                    <h1 className="text-3xl font-bold text-white drop-shadow-2xl tracking-tight mb-1">Jewellery Image Capture</h1>
+                    <div className="flex items-center gap-2 text-sm text-blue-100">
+                      <span className="inline-flex items-center gap-1.5 rounded-full bg-white/20 px-3 py-0.5 backdrop-blur-sm">
+                        <span className="h-1.5 w-1.5 rounded-full bg-yellow-400 animate-pulse" />
+                        Step 3 of 5
+                      </span>
+                      <span className="text-blue-100/80">— Regulatory compliance imaging</span>
+                    </div>
                   </div>
-                  <h1 className="text-4xl font-bold text-white drop-shadow-lg mb-2 bg-gradient-to-r from-white to-blue-100 bg-clip-text">
-                    RBI Compliance Image
-                  </h1>
-                  <p className="text-lg text-blue-100/90 font-medium">
-                    Step 3 of 5 — Regulatory compliance imaging
-                  </p>
                 </div>
               </div>
             </div>
 
-            <div className="p-12 space-y-10">
-              {/* Enhanced items count section */}
-              <div className="space-y-6">
-                <div className="relative">
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="rounded-lg bg-gradient-to-r from-blue-500 to-indigo-500 p-2">
-                      <Settings className="h-5 w-5 text-white" />
-                    </div>
-                    <label className="text-xl font-bold text-slate-800 dark:text-slate-100">
-                      Enter Number of Jewellery
-                      <span className="ml-2 text-red-500 text-xl">*</span>
-                    </label>
-                  </div>
-                  <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed mb-4">
-                    Enter the total number of jewellery items to be documented for compliance
-                  </p>
+            {/* Full Width Content */}
+            <div className="container mx-auto max-w-7xl px-8 py-10">
+              {/* Premium Items Count Section */}
+              <div className="space-y-6 mb-10">
+                <div className="group/input">
+                  <label className="mb-2 flex items-center gap-2 text-sm font-bold text-slate-800 dark:text-slate-100">
+                    <span className="h-1.5 w-1.5 rounded-full bg-blue-500" />
+                    Number of Jewellery Items <span className="text-red-500 text-base">*</span>
+                  </label>
                   <div className="relative">
                     <input
                       type="number"
@@ -486,136 +475,306 @@ export function RBICompliance() {
                       max="50"
                       value={totalItems || ''}
                       onChange={(e) => setTotalItems(parseInt(e.target.value) || 0)}
-                      placeholder="Enter number of jewellery"
-                      className="w-full px-6 py-4 text-lg font-semibold border-2 border-blue-200/60 rounded-2xl bg-gradient-to-r from-blue-50/50 to-indigo-50/50 focus:ring-4 focus:ring-blue-500/20 focus:border-blue-400 outline-none transition-all duration-300 placeholder:text-slate-400 dark:border-blue-500/30 dark:bg-slate-800/50 dark:text-blue-100"
+                      placeholder="Enter number of items (1-50)"
+                      className="w-full rounded-xl border-2 border-slate-200/80 bg-white px-4 py-3 text-base font-medium text-slate-900 shadow-sm transition-all duration-300 placeholder:text-slate-400 hover:border-blue-300 focus:border-blue-500 focus:bg-white focus:shadow-lg focus:shadow-blue-500/10 focus:ring-4 focus:ring-blue-500/20 dark:border-slate-700 dark:bg-slate-800/50 dark:text-white dark:hover:border-blue-500 dark:focus:bg-slate-800"
                     />
-                    <div className="absolute right-4 top-1/2 -translate-y-1/2">
-                      <div className="rounded-lg bg-blue-500 px-3 py-1 text-xs font-bold text-white">
-                        Items
+                    {totalItems > 0 && (
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                        <div className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-500 text-white">
+                          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  <p className="mt-2 flex items-start gap-1.5 text-xs text-slate-600 dark:text-slate-400">
+                    <svg className="mt-0.5 h-3.5 w-3.5 text-blue-500" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                    </svg>
+                    <span>Specify the total count of jewellery pieces for RBI compliance documentation.</span>
+                  </p>
+                </div>
+              </div>
+
+              {/* Status Cards - Information Only */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-10">
+                {/* Overall Collection Card */}
+                <div className="group/card relative overflow-hidden rounded-2xl border-2 border-blue-200/60 bg-gradient-to-br from-white via-blue-50/50 to-indigo-50/40 p-6 shadow-lg dark:border-blue-800/40 dark:from-slate-900/80 dark:via-blue-950/50 dark:to-indigo-950/40">
+                  <div className="absolute top-0 right-0 h-32 w-32 bg-gradient-to-br from-blue-400/10 to-transparent rounded-full blur-2xl" />
+                  
+                  <div className="relative flex items-start gap-4">
+                    <div className="flex-shrink-0 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 p-3 shadow-lg ring-4 ring-blue-500/20">
+                      <FileImage className="h-8 w-8 text-white" />
+                    </div>
+                    
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-1">
+                        Overall Collection
+                      </h3>
+                      <p className="text-sm text-slate-600 dark:text-slate-400 mb-3">
+                        Capture all jewellery items in one shot
+                      </p>
+                      
+                      <div className="flex items-center gap-3">
+                        <div className="inline-flex items-center gap-2 rounded-lg bg-blue-100 px-3 py-1.5 dark:bg-blue-900/40">
+                          <div className="h-2 w-2 rounded-full bg-blue-600 animate-pulse" />
+                          <span className="text-sm font-bold text-blue-700 dark:text-blue-300">
+                            {overallImages.length} {overallImages.length === 1 ? 'image' : 'images'}
+                          </span>
+                        </div>
+                        {overallImages.length > 0 && (
+                          <CheckCircle className="h-5 w-5 text-green-500" />
+                        )}
                       </div>
                     </div>
                   </div>
                 </div>
 
-              {/* Enhanced Two Main Action Buttons */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <button
-                  onClick={handleOpenOverallCamera}
-                  className="group relative p-8 border-3 border-dashed border-blue-300/60 rounded-3xl bg-gradient-to-br from-blue-50/60 via-indigo-50/40 to-blue-50/60 hover:border-blue-400/80 hover:from-blue-100/70 hover:via-indigo-100/50 hover:to-blue-100/70 hover:shadow-xl transition-all duration-300 dark:border-blue-500/40 dark:bg-slate-800/40 dark:hover:bg-slate-700/60"
-                >
-                  <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-blue-400/5 via-indigo-400/5 to-blue-400/5" />
-                  <div className="relative flex flex-col items-center justify-center gap-4">
-                    <div className="rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 p-4 shadow-lg group-hover:shadow-xl transition-all duration-300">
-                      <FileImage className="h-10 w-10 text-white" />
-                    </div>
-                    <div className="text-center">
-                      <h3 className="text-xl font-bold text-blue-800 group-hover:text-blue-900 dark:text-blue-300 dark:group-hover:text-blue-200">
-                        Overall Collection
-                      </h3>
-                      <p className="text-sm text-blue-600 dark:text-blue-400 mt-1">
-                        Capture all items together
-                      </p>
-                      <div className="mt-3 rounded-full bg-blue-100 px-4 py-2 dark:bg-blue-900/40">
-                        <span className="text-sm font-bold text-blue-700 dark:text-blue-300">
-                          {overallImages.length} captured
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </button>
-
-                <button
-                  onClick={handleOpenIndividualCamera}
-                  disabled={totalItems === 0}
-                  className={`group relative p-8 border-3 border-dashed rounded-3xl transition-all duration-300 ${
+                {/* Individual Items Card */}
+                <div className={`group/card relative overflow-hidden rounded-2xl border-2 p-6 shadow-lg ${
+                  totalItems === 0
+                    ? 'border-slate-200/60 bg-slate-50/50 opacity-60 dark:border-slate-800/40 dark:bg-slate-900/40'
+                    : 'border-indigo-200/60 bg-gradient-to-br from-white via-indigo-50/50 to-violet-50/40 dark:border-indigo-800/40 dark:from-slate-900/80 dark:via-indigo-950/50 dark:to-violet-950/40'
+                }`}>
+                  <div className={`absolute top-0 right-0 h-32 w-32 rounded-full blur-2xl ${
                     totalItems === 0
-                      ? 'border-slate-300 bg-slate-50 cursor-not-allowed opacity-60'
-                      : 'border-indigo-300/60 bg-gradient-to-br from-indigo-50/60 via-sky-50/40 to-indigo-50/60 hover:border-indigo-400/80 hover:from-indigo-100/70 hover:via-sky-100/50 hover:to-indigo-100/70 hover:shadow-xl dark:border-indigo-500/40 dark:bg-slate-800/40 dark:hover:bg-slate-700/60'
-                  }`}
-                >
-                  <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-indigo-400/5 via-sky-400/5 to-indigo-400/5" />
-                  <div className="relative flex flex-col items-center justify-center gap-4">
-                    <div className={`rounded-2xl p-4 shadow-lg transition-all duration-300 ${
+                      ? 'bg-slate-400/5'
+                      : 'bg-gradient-to-br from-indigo-400/10 to-transparent'
+                  }`} />
+                  
+                  <div className="relative flex items-start gap-4">
+                    <div className={`flex-shrink-0 rounded-xl p-3 shadow-lg ${
                       totalItems === 0
-                        ? 'bg-slate-400'
-                        : 'bg-gradient-to-br from-indigo-500 to-sky-600 group-hover:shadow-xl'
+                        ? 'bg-slate-400 ring-4 ring-slate-400/20'
+                        : 'bg-gradient-to-br from-indigo-500 to-violet-600 ring-4 ring-indigo-500/20'
                     }`}>
-                      <Camera className="h-10 w-10 text-white" />
+                      <Camera className="h-8 w-8 text-white" />
                     </div>
-                    <div className="text-center">
-                      <h3 className={`text-xl font-bold ${
+                    
+                    <div className="flex-1 min-w-0">
+                      <h3 className={`text-lg font-bold mb-1 ${
                         totalItems === 0
-                          ? 'text-slate-500'
-                          : 'text-indigo-800 group-hover:text-indigo-900 dark:text-indigo-300 dark:group-hover:text-indigo-200'
+                          ? 'text-slate-500 dark:text-slate-500'
+                          : 'text-slate-900 dark:text-white'
                       }`}>
                         Individual Items
                       </h3>
-                      <p className={`text-sm mt-1 ${
+                      <p className={`text-sm mb-3 ${
                         totalItems === 0
                           ? 'text-slate-400'
-                          : 'text-indigo-600 dark:text-indigo-400'
+                          : 'text-slate-600 dark:text-slate-400'
                       }`}>
-                        {totalItems === 0 ? 'Set item count first' : 'Capture each item separately'}
+                        {totalItems === 0 ? 'Set item count first' : 'Capture each item one by one'}
                       </p>
-                      <div className={`mt-3 rounded-full px-4 py-2 ${
-                        totalItems === 0
-                          ? 'bg-slate-100'
-                          : 'bg-indigo-100 dark:bg-indigo-900/40'
-                      }`}>
-                        <span className={`text-sm font-bold ${
+                      
+                      <div className="flex items-center gap-3">
+                        <div className={`inline-flex items-center gap-2 rounded-lg px-3 py-1.5 ${
                           totalItems === 0
-                            ? 'text-slate-500'
-                            : 'text-indigo-700 dark:text-indigo-300'
+                            ? 'bg-slate-100 dark:bg-slate-800'
+                            : capturedItems.length === totalItems
+                              ? 'bg-green-100 dark:bg-green-900/40'
+                              : 'bg-indigo-100 dark:bg-indigo-900/40'
                         }`}>
-                          {capturedItems.length} / {totalItems} completed
-                        </span>
+                          <span className={`text-sm font-bold ${
+                            totalItems === 0
+                              ? 'text-slate-500 dark:text-slate-500'
+                              : capturedItems.length === totalItems
+                                ? 'text-green-700 dark:text-green-300'
+                                : 'text-indigo-700 dark:text-indigo-300'
+                          }`}>
+                            {capturedItems.length} / {totalItems}
+                          </span>
+                        </div>
+                        {totalItems > 0 && capturedItems.length === totalItems && (
+                          <CheckCircle className="h-5 w-5 text-green-500" />
+                        )}
+                        {totalItems > 0 && capturedItems.length > 0 && capturedItems.length < totalItems && (
+                          <div className="flex items-center gap-1">
+                            <div className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
+                            <span className="text-xs font-medium text-amber-600 dark:text-amber-400">In Progress</span>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
-                </button>
+                </div>
+              </div>
+
+              {/* Static Camera Section */}
+              <div className="mb-10">
+                <div className="relative overflow-hidden rounded-2xl border-2 border-blue-200/60 bg-gradient-to-br from-white/90 via-blue-50/30 to-indigo-50/20 p-6 shadow-2xl shadow-blue-500/10 backdrop-blur-sm transition-all duration-500 dark:border-slate-700/60 dark:from-slate-900/90 dark:via-blue-950/20 dark:to-slate-900/80">
+                  {/* Camera Header */}
+                  <div className="flex items-start justify-between mb-5">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3 mb-2">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 shadow-lg shadow-blue-500/30">
+                          <Camera className="h-5 w-5 text-white" />
+                        </div>
+                        <div>
+                          <h2 className="text-lg font-bold text-slate-900 dark:text-white">Live Camera Preview</h2>
+                          <p className="text-xs text-slate-600 dark:text-slate-400">Real-time jewellery capture workspace</p>
+                        </div>
+                      </div>
+                    </div>
+                    <span
+                      className={
+                        captureMode
+                          ? 'inline-flex items-center gap-1 rounded-full bg-blue-100/80 px-3 py-1 text-sm font-semibold text-blue-700 dark:bg-blue-500/20 dark:text-blue-200'
+                          : 'inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 text-sm font-semibold text-slate-500 dark:bg-slate-800 dark:text-slate-200'
+                      }
+                    >
+                      <span className={`h-2 w-2 rounded-full ${captureMode ? 'bg-blue-500 animate-pulse' : 'bg-slate-400'}`} />
+                      {captureMode ? 'Live' : 'Idle'}
+                    </span>
+                  </div>
+
+                  {/* Camera Selection - only show when idle */}
+                  {!captureMode && (
+                    <div className="mb-6">
+                      <CameraSelector
+                        onCameraSelect={setSelectedCameraId}
+                        selectedDeviceId={selectedCameraId}
+                        autoDetect={true}
+                      />
+                    </div>
+                  )}
+
+                  {/* Live Camera Preview */}
+                  <LiveCamera
+                    ref={cameraRef}
+                    currentStepKey={3}
+                    selectedDeviceId={selectedCameraId}
+                    displayMode="inline"
+                    className="mt-6"
+                  />
+
+                  {/* Action Buttons */}
+                  <div className="mt-6 space-y-3">
+                    {/* Camera Control Buttons */}
+                    <div className="flex flex-wrap items-center justify-center gap-3">
+                      {!captureMode ? (
+                        <>
+                          <button
+                            onClick={handleOpenOverallCamera}
+                            className="group/btn relative overflow-hidden rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-700 px-6 py-3 font-bold text-white shadow-xl shadow-blue-500/40 transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl hover:shadow-blue-500/60"
+                          >
+                            <div className="absolute inset-0 bg-gradient-to-r from-blue-700 via-indigo-700 to-violet-800 opacity-0 transition-opacity group-hover/btn:opacity-100" />
+                            <span className="relative flex items-center gap-2">
+                              <Camera className="h-5 w-5 transition-transform group-hover/btn:rotate-12" />
+                              Open Camera
+                            </span>
+                          </button>
+                        </>
+                      ) : (
+                        <button
+                          onClick={() => {
+                            cameraRef.current?.closeCamera();
+                            setCaptureMode(null);
+                            setCurrentCapturingItem(null);
+                          }}
+                          className="group/btn flex items-center gap-2 rounded-xl border-2 border-slate-300 bg-white px-6 py-3 font-bold text-slate-700 shadow-lg transition-all duration-300 hover:-translate-y-1 hover:border-slate-400 hover:bg-slate-50 hover:shadow-xl dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:border-slate-500 dark:hover:bg-slate-700"
+                        >
+                          <span className="transition-transform group-hover/btn:-translate-x-0.5">←</span>
+                          Close Camera
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Capture Buttons - Only show when camera is open */}
+                    {captureMode && (
+                      <div className="flex flex-wrap items-center justify-center gap-3">
+                        <button
+                          onClick={handleCaptureOverallImage}
+                          className="group/btn relative overflow-hidden rounded-xl bg-gradient-to-r from-blue-500 to-indigo-600 px-6 py-3 font-bold text-white shadow-xl shadow-blue-500/30 transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl hover:shadow-blue-500/50"
+                        >
+                          <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-indigo-700 opacity-0 transition-opacity group-hover/btn:opacity-100" />
+                          <span className="relative flex items-center gap-2">
+                            <FileImage className="h-5 w-5" />
+                            Capture Overall Image {overallImages.length + 1}
+                          </span>
+                        </button>
+                        <button
+                          onClick={() => {
+                            if (totalItems === 0) {
+                              showToast('Please set the number of items first', 'error');
+                              return;
+                            }
+                            const nextItem = Array.from({ length: totalItems }, (_, i) => i + 1)
+                              .find(num => !getItemImage(num));
+                            if (nextItem) {
+                              const imageData = cameraRef.current?.captureImage();
+                              if (imageData) {
+                                setCapturedItems((prev) => {
+                                  const filtered = prev.filter((item) => item.itemNumber !== nextItem);
+                                  return [...filtered, { itemNumber: nextItem, image: imageData }];
+                                });
+                                showToast(`Item ${nextItem} captured!`, 'success');
+                              }
+                            } else {
+                              showToast('All items have been captured', 'info');
+                            }
+                          }}
+                          disabled={totalItems === 0}
+                          className="group/btn relative overflow-hidden rounded-xl bg-gradient-to-r from-indigo-500 to-violet-600 px-6 py-3 font-bold text-white shadow-xl shadow-indigo-500/30 transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl hover:shadow-indigo-500/50 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0"
+                        >
+                          <div className="absolute inset-0 bg-gradient-to-r from-indigo-600 to-violet-700 opacity-0 transition-opacity group-hover/btn:opacity-100" />
+                          <span className="relative flex items-center gap-2">
+                            <Camera className="h-5 w-5" />
+                            Capture Individual Item
+                          </span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
 
               {/* Enhanced Capture Progress Summary */}
               {(overallImages.length > 0 || capturedItems.length > 0) && (
-                <div className="rounded-3xl border-2 border-blue-200/70 bg-gradient-to-br from-blue-50/80 to-indigo-50/60 p-6 shadow-lg dark:border-blue-500/30 dark:from-blue-950/40 dark:to-indigo-950/30">
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="rounded-lg bg-blue-500 p-2">
-                      <Zap className="h-5 w-5 text-white" />
+                <div className="relative overflow-hidden rounded-2xl border border-blue-200/60 bg-gradient-to-br from-blue-50/80 via-indigo-50/50 to-blue-50/80 p-6 shadow-lg shadow-blue-500/5 backdrop-blur-sm dark:border-slate-700/60 dark:from-slate-900/80 dark:via-blue-950/50 dark:to-slate-900/80 mb-10">
+                  <div className="absolute top-0 right-0 h-32 w-32 bg-gradient-to-br from-blue-400/10 to-transparent rounded-full blur-2xl" />
+                  <div className="relative">
+                    <div className="flex items-center gap-2 mb-4">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-500 shadow-lg shadow-blue-500/30">
+                        <Zap className="h-5 w-5 text-white" />
+                      </div>
+                      <h2 className="text-base font-bold text-blue-900 dark:text-blue-100">Capture Progress</h2>
                     </div>
-                    <h4 className="text-xl font-bold text-blue-800 dark:text-blue-100">
-                      Capture Progress
-                    </h4>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="text-center p-4 rounded-2xl bg-white/60 dark:bg-blue-900/30">
-                      <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-                        {overallImages.length}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="text-center p-4 rounded-xl bg-white/60 backdrop-blur-sm dark:bg-slate-800/40">
+                        <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                          {overallImages.length}
+                        </div>
+                        <div className="text-sm text-blue-700 dark:text-blue-300 font-medium">
+                          Overall Images
+                        </div>
                       </div>
-                      <div className="text-sm text-blue-700 dark:text-blue-300 font-medium">
-                        Overall Images
+                      <div className="text-center p-4 rounded-xl bg-white/60 backdrop-blur-sm dark:bg-slate-800/40">
+                        <div className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">
+                          {capturedItems.length} / {totalItems}
+                        </div>
+                        <div className="text-sm text-indigo-700 dark:text-indigo-300 font-medium">
+                          Individual Items
+                        </div>
                       </div>
-                    </div>
-                    <div className="text-center p-4 rounded-2xl bg-white/60 dark:bg-indigo-900/30">
-                      <div className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">
-                        {capturedItems.length} / {totalItems}
-                      </div>
-                      <div className="text-sm text-indigo-700 dark:text-indigo-300 font-medium">
-                        Individual Items
-                      </div>
-                    </div>
-                    <div className="text-center p-4 rounded-2xl bg-white/60 dark:bg-sky-900/30">
-                      <div className="text-lg font-bold text-sky-600 dark:text-sky-400">
-                        {canProceed() ? '✓' : '○'}
-                      </div>
-                      <div className="text-sm text-sky-700 dark:text-sky-300 font-medium">
-                        Ready to Proceed
+                      <div className="text-center p-4 rounded-xl bg-white/60 backdrop-blur-sm dark:bg-slate-800/40">
+                        <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
+                          {canProceed() ? '✓' : '○'}
+                        </div>
+                        <div className="text-sm text-emerald-700 dark:text-emerald-300 font-medium">
+                          Ready to Proceed
+                        </div>
                       </div>
                     </div>
-                  </div>
-                  <div className="mt-4 p-4 rounded-2xl bg-gradient-to-r from-blue-100 to-indigo-100 dark:from-blue-900/30 dark:to-indigo-900/30">
-                    <p className="text-sm text-blue-800 dark:text-blue-200 text-center leading-relaxed">
-                      💡 <strong>Tip:</strong> You can proceed with either complete overall images OR all individual item captures
-                    </p>
+                    <div className="mt-4 flex items-start gap-3 rounded-xl border-2 border-blue-300/40 bg-white/70 p-4 shadow-sm backdrop-blur-sm dark:border-blue-700/40 dark:bg-slate-800/70">
+                      <svg className="mt-0.5 h-5 w-5 flex-shrink-0 text-blue-600 dark:text-blue-400" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                      </svg>
+                      <p className="text-sm font-semibold text-blue-900 dark:text-blue-100">
+                        You can proceed with either complete overall images OR all individual item captures.
+                      </p>
+                    </div>
                   </div>
                 </div>
               )}
@@ -751,136 +910,79 @@ export function RBICompliance() {
                 )}
               </div>
             )}
-          </div>
 
-          {/* Enhanced footer */}
-          <div className="border-t border-blue-100/70 bg-gradient-to-r from-blue-50/80 via-indigo-50/60 to-sky-50/80 px-10 py-8 dark:border-blue-500/30 dark:from-blue-950/60 dark:via-indigo-950/50 dark:to-sky-950/60">
-            <div className="flex flex-col items-center justify-between gap-6 md:flex-row">
-              {/* Previous Button */}
-              <button
-                onClick={() => navigate('/customer-image')}
-                className="flex items-center gap-3 rounded-2xl bg-white/90 px-8 py-4 font-bold text-slate-700 shadow-lg ring-2 ring-slate-200/50 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:ring-slate-300/60 dark:bg-slate-800/80 dark:text-slate-300 dark:ring-slate-600/50 dark:hover:ring-slate-500/60"
-              >
-                <ArrowLeft className="h-5 w-5" />
-                Previous Step
-              </button>
-              
-              {/* GPS Info + Map */}
-              <div className="flex-1 flex justify-center">
-                {gpsLoading ? (
-                  <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400">
-                    <Loader2 className="h-5 w-5 animate-spin" />
-                    <span className="font-medium">Getting location...</span>
+            {/* Premium Footer - Full Width */}
+            <div className="border-t-2 border-slate-200/60 bg-gradient-to-r from-slate-50/90 via-white/90 to-slate-50/90 backdrop-blur-sm dark:border-slate-800/60 dark:from-slate-900/90 dark:via-slate-900/95 dark:to-slate-900/90">
+              <div className="container mx-auto max-w-7xl px-8 py-6">
+                <div className="flex flex-col items-center justify-center gap-4 md:flex-row md:gap-6">
+                  <button
+                    onClick={() => navigate('/customer-image')}
+                    className="group/btn flex items-center gap-2 rounded-xl bg-white px-6 py-2.5 font-bold text-slate-700 shadow-lg ring-2 ring-slate-200 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:ring-slate-300 dark:bg-slate-800 dark:text-slate-200 dark:ring-slate-700 dark:hover:ring-slate-600"
+                  >
+                    <ArrowLeft className="h-4 w-4 transition-transform group-hover/btn:-translate-x-1" />
+                    Back to Previous
+                  </button>
+                  
+                  {/* GPS Info */}
+                  <div className="flex-1 flex justify-center">
+                    {gpsLoading ? (
+                      <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400">
+                        <Loader2 className="h-5 w-5 animate-spin" />
+                        <span className="font-medium text-sm">Getting location...</span>
+                      </div>
+                    ) : gpsError ? (
+                      <div className="flex items-center gap-2 text-red-600 dark:text-red-400">
+                        <AlertCircle className="h-5 w-5" />
+                        <span className="font-medium text-sm">{gpsError}</span>
+                      </div>
+                    ) : gpsData ? (
+                      <div className="flex flex-col items-center gap-2">
+                        <div className="flex items-center gap-2 text-xs font-semibold text-slate-700 dark:text-slate-300">
+                          <MapPin className="h-4 w-4 text-blue-500" />
+                          <span>
+                            {gpsData.latitude.toFixed(6)}, {gpsData.longitude.toFixed(6)}
+                          </span>
+                          {gpsData.address && (
+                            <span className="text-slate-600 dark:text-slate-400">
+                              • {gpsData.address}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    ) : null}
                   </div>
-                ) : gpsError ? (
-                  <div className="flex items-center gap-2 text-red-600 dark:text-red-400">
-                    <AlertCircle className="h-5 w-5" />
-                    <span className="font-medium">{gpsError}</span>
-                  </div>
-                ) : gpsData ? (
-                  <div className="flex flex-col items-center gap-3 max-w-md">
-                    <div className="flex items-center gap-2 text-sm font-semibold text-blue-700 dark:text-blue-300">
-                      <MapPin className="h-5 w-5" />
-                      <span>
-                        {gpsData.latitude.toFixed(6)}, {gpsData.longitude.toFixed(6)}
-                      </span>
-                      <Globe className="h-4 w-4 text-indigo-600" />
-                      <span className="text-xs uppercase tracking-wider">
-                        {gpsData.source}
-                      </span>
-                      {/* Address - same color, right-aligned */}
-                      <span className="ml-3 text-blue-700 dark:text-blue-300 font-medium text-sm">
-                        {gpsData.address || 'Address not available'}
-                      </span>
-                    </div>
-                    {gpsData.map_image && (
-                      <img
-                        src={gpsData.map_image}
-                        alt="GPS Location Map"
-                        className="w-48 h-48 rounded-xl border border-blue-200 shadow-lg object-cover"
-                      />
-                    )}
-                    <p className="text-xs text-slate-600 dark:text-slate-400">
-                      Captured: {new Date(gpsData.timestamp).toLocaleString('en-IN')}
-                    </p>
-                  </div>
-                ) : null}
-              </div>
 
-              
-              {/* Next Button */}
-              <div className="flex items-center gap-4">
-                {canProceed() && (
-                  <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400">
-                    <div className="rounded-full bg-blue-500 p-1">
-                      <CheckCircle className="h-3 w-3 text-white" />
-                    </div>
-                    <span className="text-sm font-semibold">Documentation complete</span>
-                  </div>
-                )}
-                
-                <button
-                  onClick={handleNext}
-                  disabled={isLoading || !canProceed()}
-                  className={`flex items-center gap-3 rounded-2xl px-8 py-4 font-bold text-white shadow-xl transition-all duration-300 ${
-                    canProceed() && !isLoading
-                      ? 'bg-gradient-to-r from-blue-500 via-indigo-500 to-sky-600 shadow-blue-500/30 hover:-translate-y-1 hover:shadow-2xl hover:shadow-blue-600/40 active:translate-y-0'
-                      : 'bg-slate-400 cursor-not-allowed shadow-slate-400/30'
-                  }`}
-                  title={getNextButtonStatus().title}
-                >
-                  {isLoading ? (
-                    <>
-                      <div className="h-5 w-5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-                      Processing...
-                    </>
-                  ) : (
-                    <>
-                      {getNextButtonStatus().text}
-                      <ArrowRight className="h-5 w-5" />
-                    </>
-                  )}
-                </button>
+                  <button
+                    onClick={handleNext}
+                    disabled={isLoading || !canProceed()}
+                    className="group/btn relative overflow-hidden rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-700 px-8 py-2.5 font-bold text-white shadow-xl shadow-blue-500/40 transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl hover:shadow-blue-500/60 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0"
+                    title={getNextButtonStatus().title}
+                  >
+                    <div className="absolute inset-0 bg-gradient-to-r from-blue-700 via-indigo-700 to-violet-800 opacity-0 transition-opacity group-hover/btn:opacity-100" />
+                    <span className="relative flex items-center gap-2">
+                      {isLoading ? (
+                        <>
+                          <svg className="h-5 w-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                          </svg>
+                          Saving...
+                        </>
+                      ) : (
+                        <>
+                          {getNextButtonStatus().text}
+                          <ArrowRight className="h-4 w-4 transition-transform group-hover/btn:translate-x-1" />
+                        </>
+                      )}
+                    </span>
+                  </button>
+                </div>
               </div>
             </div>
           </div>
         </div>
       </div>
-
-      {/* Camera Selection - shown only when camera is not open */}
-      {!captureMode && (
-        <div className="fixed bottom-8 right-8 z-40 max-w-md">
-          <CameraSelector
-            onCameraSelect={setSelectedCameraId}
-            selectedDeviceId={selectedCameraId}
-            autoDetect={true}
-          />
-        </div>
-      )}
-
-      <LiveCamera 
-        ref={cameraRef} 
-        currentStepKey={3}
-        selectedDeviceId={selectedCameraId}
-      />
-
-      {cameraRef.current && captureMode && (
-        <div className="fixed bottom-8 left-1/2 transform -translate-x-1/2 z-50">
-          <button
-            onClick={captureMode === 'overall' ? handleCaptureOverallImage : handleCaptureItem}
-            className="px-8 py-4 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white rounded-full font-bold text-lg shadow-2xl hover:shadow-3xl transition-all flex items-center gap-3"
-          >
-            <Camera className="w-6 h-6" />
-            {captureMode === 'overall'
-              ? `Capture Overall Image ${overallImages.length + 1}`
-              : currentCapturingItem !== null 
-                ? `Capture Item ${currentCapturingItem}`
-                : 'Capture Item'}
-          </button>
-        </div>
-      )}
     </div>
-  </div>
   );
 }
 

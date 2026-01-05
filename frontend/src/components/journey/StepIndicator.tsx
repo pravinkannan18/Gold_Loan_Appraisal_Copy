@@ -14,8 +14,8 @@ const steps = [
 
 export function StepIndicator({ currentStep }: StepIndicatorProps) {
   return (
-    <div className="w-full px-4 sm:px-6 lg:px-8 py-4">
-      <div className="max-w-6xl mx-auto flex items-center justify-between gap-3 rounded-full border border-slate-200/70 dark:border-slate-800/70 bg-white/85 dark:bg-slate-900/70 backdrop-blur-lg px-4 py-3 shadow-sm shadow-blue-200/30 dark:shadow-blue-950/30">
+    <div className="w-full px-4 sm:px-6 lg:px-8 py-2">
+      <div className="max-w-5xl mx-auto flex items-center justify-between gap-2 rounded-2xl border border-slate-200/60 dark:border-slate-800/60 bg-white/90 dark:bg-slate-900/80 backdrop-blur-xl px-3 py-2 shadow-md shadow-blue-100/20 dark:shadow-blue-950/20">
           {steps.map((step, index) => {
             const Icon = step.icon;
             const isCompleted = currentStep > step.number;
@@ -35,7 +35,7 @@ export function StepIndicator({ currentStep }: StepIndicatorProps) {
                     </>
                   )}
                   <div
-                    className={`w-11 h-11 rounded-xl flex items-center justify-center border transition-all duration-500 ease-out ${
+                    className={`w-9 h-9 rounded-lg flex items-center justify-center border transition-all duration-500 ease-out ${
                       isCompleted
                         ? 'bg-gradient-to-br from-emerald-400 to-emerald-500 border-emerald-400 shadow-lg shadow-emerald-500/40 scale-100'
                         : isActive
@@ -44,7 +44,7 @@ export function StepIndicator({ currentStep }: StepIndicatorProps) {
                     }`}
                   >
                     <Icon
-                      className={`w-5 h-5 transition-all duration-300 ${
+                      className={`w-4 h-4 transition-all duration-300 ${
                         isCompleted
                           ? 'text-white'
                           : isActive
@@ -54,7 +54,7 @@ export function StepIndicator({ currentStep }: StepIndicatorProps) {
                     />
                   </div>
                   <span
-                    className={`text-sm font-semibold tracking-wide whitespace-nowrap ${
+                    className={`text-xs font-semibold tracking-wide whitespace-nowrap hidden sm:inline ${
                       isCompleted
                         ? 'text-emerald-600 dark:text-emerald-300'
                         : isActive
@@ -67,7 +67,7 @@ export function StepIndicator({ currentStep }: StepIndicatorProps) {
                 </div>
 
                 {index < steps.length - 1 && (
-                  <div className="flex-1 h-1 mx-2">
+                  <div className="flex-1 h-0.5 mx-1.5">
                     <div
                       className={`h-full rounded-full transition-all duration-700 ease-out ${
                         currentStep > step.number

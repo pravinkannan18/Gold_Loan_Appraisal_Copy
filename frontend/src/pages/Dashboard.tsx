@@ -178,31 +178,30 @@ const Dashboard = () => {
     <AuroraLayout>
   <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(59,130,246,0.12),_transparent_45%),_radial-gradient(circle_at_bottom,_rgba(14,165,233,0.18),_transparent_55%)]">
         {/* Header */}
-        <header className="border-b border-neutral-200 dark:border-neutral-700 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-md">
-          <div className="px-4 py-4 flex items-center justify-end">
-            <div className="flex items-center gap-4">
-              <span className="text-sm text-neutral-700 dark:text-neutral-300">Welcome, {userName}</span>
-              <Button variant="ghost" size="sm" onClick={handleSignOut}>
-                <LogOut className="mr-2 h-4 w-4" />
+        <header className="border-b border-neutral-200/50 dark:border-neutral-700/50 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-xl shadow-sm">
+          <div className="max-w-7xl mx-auto px-6 py-2.5 flex items-center justify-end">
+            <div className="flex items-center gap-3">
+              <span className="text-xs text-neutral-600 dark:text-neutral-400">{userName}</span>
+              <Button variant="ghost" size="sm" onClick={handleSignOut} className="h-8 text-xs">
+                <LogOut className="mr-1.5 h-3.5 w-3.5" />
                 Sign Out
               </Button>
             </div>
           </div>
         </header>
 
-        {/* Hero Section */}
-        <main className="px-4 py-1">
-          {/* Logo Section - Above AI-Powered Gold Appraisals */}
-          <div className="flex justify-start mb-0 mt-4">
-            <img
-              src="/Embsys%20Intelligence%20logo.png"
-              alt="Embsys Intelligence logo"
-              className="h-24 w-auto"
-              style={{ transform: 'rotate(0deg)', imageOrientation: 'from-image' }}
-            />
-          </div>
+        {/* Logo Section */}
+        <div className="flex justify-start px-6 py-3">
+          <img
+            src="/Embsys%20Intelligence%20logo.png"
+            alt="Embsys Intelligence"
+            className="h-24 w-auto"
+          />
+        </div>
 
-          <div className="[&_[data-diced-top-text]]:font-semibold [&_[data-diced-main-text]]:font-bold [&_[data-diced-main-text]]:leading-tight [&_[data-diced-sub-text]]:leading-relaxed [&_[data-diced-sub-text]]:font-normal lobster-subtext -mt-20">
+        {/* Hero Section */}
+        <main className="px-4 py-2">
+          <div className="[&_[data-diced-top-text]]:font-semibold [&_[data-diced-main-text]]:font-bold [&_[data-diced-main-text]]:leading-tight [&_[data-diced-sub-text]]:leading-relaxed [&_[data-diced-sub-text]]:font-normal lobster-subtext">
             <DicedHeroSection
               topText="AI-Powered Gold Appraisals"
               mainText="Gold Guardian Pro"

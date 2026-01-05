@@ -715,7 +715,7 @@ export function PurityTesting() {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-sky-100">
       <StepIndicator currentStep={4} />
 
-      <div className="max-w-6xl mx-auto px-4 py-8">
+      <div className="w-full px-6 py-8">
         {/* Camera Selection Panel */}
         {showCameraSelection && (
           <div className="mb-6 bg-white/95 backdrop-blur-sm rounded-2xl p-6 shadow-xl border-2 border-blue-300">
@@ -928,7 +928,7 @@ export function PurityTesting() {
                       autoPlay
                       playsInline
                       muted
-                      className={`w-full h-64 object-cover ${annotatedFrame1 && isRecording ? 'hidden' : 'block'}`}
+                      className={`w-full h-96 object-cover ${annotatedFrame1 && isRecording ? 'hidden' : 'block'}`}
                     />
                     <canvas ref={canvas1Ref} className="hidden" />
 
@@ -937,7 +937,7 @@ export function PurityTesting() {
                       <img
                         src={annotatedFrame1}
                         alt="Top View Annotated"
-                        className="w-full h-64 object-cover"
+                        className="w-full h-96 object-cover"
                       />
                     )}
 
@@ -970,7 +970,7 @@ export function PurityTesting() {
                       autoPlay
                       playsInline
                       muted
-                      className={`w-full h-64 object-cover ${annotatedFrame2 && isRecording ? 'hidden' : 'block'}`}
+                      className={`w-full h-96 object-cover ${annotatedFrame2 && isRecording ? 'hidden' : 'block'}`}
                     />
                     <canvas ref={canvas2Ref} className="hidden" />
 
@@ -979,7 +979,7 @@ export function PurityTesting() {
                       <img
                         src={annotatedFrame2}
                         alt="Side View Annotated"
-                        className="w-full h-64 object-cover"
+                        className="w-full h-96 object-cover"
                       />
                     )}
 
