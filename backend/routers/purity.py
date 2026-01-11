@@ -27,27 +27,32 @@ async def purity_status():
     """Get purity testing service status"""
     return {
         "available": purity_service.is_available(),
-        "service": "PurityTestingService",
+        "service": "PurityTestingService-Visual",
         "available_cameras": purity_service.get_available_cameras(),
         "models_loaded": {
-            "model1": purity_service.model1 is not None,
-            "model2": purity_service.model2 is not None
+            "model_gold": purity_service.model_gold is not None,
+            "model_stone": purity_service.model_stone is not None,
+            "model_acid": purity_service.model_acid is not None
         },
         "model_paths": {
-            "model1": purity_service.model1_path,
-            "model2": purity_service.model2_path
+            "model_gold": purity_service.MODEL_GOLD_PATH,
+            "model_stone": purity_service.MODEL_STONE_PATH,
+            "model_acid": purity_service.MODEL_ACID_PATH
         },
         "models_exist": {
-            "model1": os.path.exists(purity_service.model1_path),
-            "model2": os.path.exists(purity_service.model2_path)
-        }
+            "model_gold": os.path.exists(purity_service.MODEL_GOLD_PATH),
+            "model_stone": os.path.exists(purity_service.MODEL_STONE_PATH),
+            "model_acid": os.path.exists(purity_service.MODEL_ACID_PATH)
+        },
+        "running": purity_service.is_running,
+        "current_task": purity_service.current_task
     }
 
 @router.get("/cameras/list")
 async def list_cameras():
     """Get detailed list of available cameras with their specifications"""
     try:
-        cameras = purity_service.get_camera_details()
+        cameras = purity_service.get_available_cameras()
         return {
             "success": True,
             "cameras": cameras,
@@ -131,7 +136,7 @@ async def purity_create_sample():
     return purity_service.create_sample_csv_files()
 
 @router.post("/analyze_frame")
-def analyze_frame(payload: dict):
+async def analyze_frame(payload: dict):
     """Analyze a single frame with YOLO (for testing)"""
     import base64
     import cv2
@@ -147,23 +152,19 @@ def analyze_frame(payload: dict):
     if frame is None:
         raise HTTPException(status_code=400, detail="Invalid image")
 
-    # Use the YOLO analysis method
-    annotated = purity_service.run_yolo_analysis_on_frame(frame)
-
-    _, buf = cv2.imencode('.jpg', annotated, [int(cv2.IMWRITE_JPEG_QUALITY), 85])
-    annotated_b64 = base64.b64encode(buf).decode()
-    annotated_url = f"data:image/jpeg;base64,{annotated_b64}"
+    # Use the analyze_frames method with a single frame
+    results = await purity_service.analyze_frames(frame1_b64=payload.get("frame"))
 
     return {
-        "annotated_frame": annotated_url,
+        "annotated_frame": results.get("annotated_frame1"),
         "detection_status": purity_service.get_detection_status()
     }
 
 @router.post("/analyze")
-def analyze_dual_frames(request: AnalyzeRequest):
+async def analyze_dual_frames(request: AnalyzeRequest):
     """Analyze dual frames sent from frontend"""
     try:
-        results = purity_service.analyze_frames(
+        results = await purity_service.analyze_frames(
             frame1_b64=request.frame1,
             frame2_b64=request.frame2
         )
@@ -175,7 +176,14 @@ def analyze_dual_frames(request: AnalyzeRequest):
 async def reload_models():
     """Force reload YOLO models"""
     try:
-        result = purity_service.reload_models()
-        return result
+        purity_service._load_models()
+        return {
+            "success": True,
+            "models_loaded": {
+                "model_gold": purity_service.model_gold is not None,
+                "model_stone": purity_service.model_stone is not None,
+                "model_acid": purity_service.model_acid is not None
+            }
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

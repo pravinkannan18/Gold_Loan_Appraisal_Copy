@@ -1,6 +1,7 @@
 # Environment variables (keep .env.example for reference)
 .env
 
+rub.py
 # Python cache
 __pycache__/
 *.pyc

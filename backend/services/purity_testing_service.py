@@ -1,493 +1,550 @@
 """
 Purity Testing Service for Gold Loan Appraisal System
-Converted from FastAPI to regular Python service
+Backend-driven camera detection with MJPEG streaming
+Based on rub.py logic
 """
 
 import os
 import cv2
 import time
-import math
 import warnings
 import pandas as pd
 import numpy as np
 import base64
-from typing import Optional, Dict, List, Any, Tuple
+import torch
+from typing import Optional, Dict, List, Any
 from datetime import datetime
 import threading
-import queue
+from collections import deque
+from pathlib import Path
+from fastapi.responses import StreamingResponse
 
 # Suppress warnings
 warnings.filterwarnings("ignore")
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 
-# Try to import YOLO - make it optional for development
+# Fix for PyTorch 2.6+ weights_only default change
+# Monkeypatch torch.load to use weights_only=False for YOLO models
+_original_torch_load = torch.load
+def _patched_torch_load(*args, **kwargs):
+    if 'weights_only' not in kwargs:
+        kwargs['weights_only'] = False
+    return _original_torch_load(*args, **kwargs)
+torch.load = _patched_torch_load
+
+# Try to import YOLO
 try:
     from ultralytics import YOLO
-    import torch
-    
-    # Fix for newer PyTorch versions that default to weights_only=True
-    # This is required for loading YOLO models which use custom classes
-    try:
-        if hasattr(torch.serialization, 'add_safe_globals'):
-            import ultralytics.nn.tasks
-            import ultralytics.nn.modules.conv
-            import ultralytics.nn.modules.block
-            import ultralytics.nn.modules.head
-            import torch.nn.modules.container
-            import torch.nn.modules.conv
-            import torch.nn.modules.batchnorm
-            import torch.nn.modules.activation
-            import torch.nn.modules.pooling
-            import torch.nn.modules.upsampling
-            import torch.nn.modules.linear
-            import collections
-            
-            # Common classes found in YOLOv8 models
-            safe_classes = [
-                ultralytics.nn.tasks.DetectionModel,
-                ultralytics.nn.modules.conv.Conv,
-                ultralytics.nn.modules.conv.Concat,
-                ultralytics.nn.modules.block.C2f,
-                ultralytics.nn.modules.block.Bottleneck,
-                ultralytics.nn.modules.block.DFL,
-                ultralytics.nn.modules.block.SPPF,
-                ultralytics.nn.modules.head.Detect,
-                torch.nn.modules.container.Sequential,
-                torch.nn.modules.container.ModuleList,
-                torch.nn.modules.conv.Conv2d,
-                torch.nn.modules.batchnorm.BatchNorm2d,
-                torch.nn.modules.activation.SiLU,
-                torch.nn.modules.pooling.MaxPool2d,
-                torch.nn.modules.upsampling.Upsample,
-                torch.nn.modules.linear.Identity,
-                torch.Size,
-                torch.device,
-                collections.OrderedDict,
-            ]
-            
-            # Add storage types if available
-            for storage in ['FloatStorage', 'LongStorage', 'IntStorage', 'DoubleStorage', 'HalfStorage', 'ByteStorage', 'CharStorage', 'ShortStorage', 'BoolStorage', 'UntypedStorage']:
-                if hasattr(torch, storage):
-                    safe_classes.append(getattr(torch, storage))
-            
-            torch.serialization.add_safe_globals(safe_classes)
-            print("✓ Added comprehensive YOLO/Torch classes to safe globals")
-    except Exception as e:
-        print(f"⚠️ Failed to add safe globals: {e}")
-
     YOLO_AVAILABLE = True
-    print("YOLO libraries loaded successfully")
+    print("✓ YOLO libraries loaded successfully")
 except ImportError as e:
-    print(f"YOLO libraries not available: {e}")
-    print("Install with: pip install ultralytics")
+    print(f"⚠️ YOLO libraries not available: {e}")
     YOLO_AVAILABLE = False
-    # Mock class for development
-    class YOLO:
-        def __init__(self, model_path):
-            self.model_path = model_path
-            self.model = type('obj', (object,), {'names': {}})()
-        def predict(self, frame, **kwargs):
-            return [type('obj', (object,), {
-                'boxes': type('obj', (object,), {
-                    'xyxy': type('obj', (object,), {'cpu': lambda: type('obj', (object,), {'numpy': lambda: np.array([])})()})(),
-                    'cls': type('obj', (object,), {'cpu': lambda: type('obj', (object,), {'numpy': lambda: np.array([])})()})()
-                })()
-            })]
+
 
 class PurityTestingService:
-    """Service class for handling purity testing operations"""
+    """
+    Purity testing service with backend-driven camera detection.
+    - Opens cameras on the backend
+    - Runs specific YOLO detection (Gold/Stone/Acid)
+    - Streams annotated MJPEG to frontend
+    """
+
+    # ---- CONFIG ------------------------------------------------
+    # Use absolute paths based on this file's location
+    _BASE_DIR = Path(__file__).resolve().parent.parent
+    _ML_MODELS_DIR = _BASE_DIR / "ml_models"
     
+    MODEL_GOLD_PATH = _ML_MODELS_DIR / "best_top2.pt"
+    MODEL_STONE_PATH = _ML_MODELS_DIR / "best_top_stone.pt"
+    MODEL_ACID_PATH = _ML_MODELS_DIR / "best_aci_liq.pt"
+    
+    CAM_INDEX = 0
+    CONF_THRESH = 0.5
+    IMGSZ = 320
+    
+    # Colors
+    STONE_BOX_COLOR = (0, 0, 255)
+    GOLD_OVERLAY_COLOR = (0, 215, 255)
+    
+    # Detection thresholds
+    THRESHOLD_OF_FLUCTUATION = 2.0
+    NO_OF_FLUCTUATIONS = 3
+    WINDOW_SIZE = 10
+    # ------------------------------------------------------------
+
     def __init__(self, database=None):
         self.db = database
         self.available = YOLO_AVAILABLE
-        
-        # Detection status tracking
-        self.detection_status = {"message": "No detection yet", "timestamp": None}
-        self.detection_states = {}
-        
-        # Models and cameras
-        self.model1 = None
-        self.model2 = None
-        self.camera1 = None
-        self.camera2 = None
-        
+
+        # Detection status
+        self.detection_status = {
+            "message": "Waiting to start...",
+            "rubbing_detected": False,
+            "acid_detected": False,
+            "current_task": "rubbing"
+        }
+        self.rubbing_confirmed = False
+        self.acid_detected = False
+
+        # Cameras (lazy init on start)
+        self.camera1 = None  # Top view / Rubbing
+        self.camera2 = None  # Side view / Acid
+        self.camera1_index = 0
+        self.camera2_index = 1
+
         # Service state
         self.is_running = False
-        self.current_task = None
+        self.current_task = "rubbing"  # "rubbing" -> "acid" -> "done"
+
+        # Rubbing verification state
+        self.recent_distances = deque(maxlen=self.WINDOW_SIZE)
+        self.prev_centroid = None
+
+        # Load YOLO models
+        self.model_gold = None
+        self.model_stone = None
+        self.model_acid = None
         
-        # Configuration - Updated paths
-        self.model1_path = "ml_models/best_rub2_2.pt"
-        self.model2_path = "ml_models/best_rub2_1.pt"
-        self.csv1_path = "data/task_sequence.csv"
-        self.csv2_path = "data/task_sequence_main.csv"
-        
-        # CSV Cache to avoid repeated disk reads
-        self._csv_cache = {}
-        
-        # Threading for video processing
-        self._stop_event = threading.Event()
-        # self._video_threads = {}
-        # self._frame_queues = {}
-        
-        # Initialize if available
-        if self.available:
-            self._initialize_models()
-    
-    def _initialize_models(self):
-        """Initialize YOLO models"""
-        print("\n🔄 Initializing YOLO models...")
-        model1_loaded = False
-        model2_loaded = False
+        if YOLO_AVAILABLE:
+            self._load_models()
+
+    # ------------------------------------------------------------------ MODELS
+    def _load_models(self):
+        """Load YOLO models"""
+        print("\n🔄 Loading YOLO models...")
         
         try:
-            # Load Model 1 (Rubbing Test)
-            if os.path.exists(self.model1_path):
-                print(f"  Loading Model 1: {self.model1_path}")
-                self.model1 = YOLO(self.model1_path)
-                print(f"  ✓ Model 1 loaded successfully")
-                print(f"    Class Names: {self.model1.model.names if hasattr(self.model1, 'model') else self.model1.names}")
-                model1_loaded = True
+            if self.MODEL_GOLD_PATH.exists():
+                self.model_gold = YOLO(str(self.MODEL_GOLD_PATH))
+                print(f"  ✓ Gold model loaded: {self.MODEL_GOLD_PATH}")
             else:
-                print(f"  ⚠️ Model 1 file not found: {self.model1_path}")
-                print(f"    Current directory: {os.getcwd()}")
+                print(f"  ⚠️ Gold model not found: {self.MODEL_GOLD_PATH}")
+
+            if self.MODEL_STONE_PATH.exists():
+                self.model_stone = YOLO(str(self.MODEL_STONE_PATH))
+                print(f"  ✓ Stone model loaded: {self.MODEL_STONE_PATH}")
+            else:
+                print(f"  ⚠️ Stone model not found: {self.MODEL_STONE_PATH}")
+                
+            if self.MODEL_ACID_PATH.exists():
+                self.model_acid = YOLO(str(self.MODEL_ACID_PATH))
+                print(f"  ✓ Acid model loaded: {self.MODEL_ACID_PATH}")
+            else:
+                print(f"  ⚠️ Acid model not found: {self.MODEL_ACID_PATH}")
                 
         except Exception as e:
-            print(f"  ❌ Error loading Model 1: {e}")
-            import traceback
-            traceback.print_exc()
-            self.model1 = None
-        
+            print(f"  ❌ Error loading models: {e}")
+
+        self.available = (self.model_gold is not None and 
+                          self.model_stone is not None and 
+                          self.model_acid is not None)
+                          
+        print(f"  Models available: {self.available}")
+
+    # ------------------------------------------------------------------ REFLECTION LOGIC (Ported)
+    def _process_rubbing_frame(self, frame):
+        H, W = frame.shape[:2]
+        annotated = frame.copy()
+        gold_clipped_full = np.zeros((H, W), dtype=np.uint8)
+        gold_mask_pct = 0.0
+        stone_bbox = None
+
+        largest_box_full = None
         try:
-            # Load Model 2 (Acid Test)
-            if os.path.exists(self.model2_path):
-                print(f"  Loading Model 2: {self.model2_path}")
-                self.model2 = YOLO(self.model2_path)
-                print(f"  ✓ Model 2 loaded successfully")
-                print(f"    Class Names: {self.model2.model.names if hasattr(self.model2, 'model') else self.model2.names}")
-                model2_loaded = True
-            else:
-                print(f"  ⚠️ Model 2 file not found: {self.model2_path}")
-                print(f"    Current directory: {os.getcwd()}")
-                
+            # Predict Stone
+            if self.model_stone:
+                res_s = next(self.model_stone.predict(frame, imgsz=self.IMGSZ, conf=self.CONF_THRESH, iou=0.45, stream=True, verbose=False))
+                rs = res_s[0] if len(res_s) > 0 else None
+                if rs and rs.boxes is not None:
+                    xyxy = rs.boxes.xyxy.cpu().numpy()
+                    largest_area = 0
+                    for b in xyxy:
+                        x1, y1, x2, y2 = map(int, b[:4])
+                        area = (x2 - x1) * (y2 - y1)
+                        if area > largest_area:
+                            largest_area = area
+                            largest_box_full = (x1, y1, x2, y2)
+            
+            if largest_box_full:
+                x1, y1, x2, y2 = largest_box_full
+                cv2.rectangle(annotated, (x1, y1), (x2, y2), self.STONE_BOX_COLOR, 2)
         except Exception as e:
-            print(f"  ❌ Error loading Model 2: {e}")
-            import traceback
-            traceback.print_exc()
-            self.model2 = None
-        
-        # Service is available if at least one model loaded
-        if model1_loaded or model2_loaded:
-            print(f"\n✓ Purity Testing Service Ready (Model1: {model1_loaded}, Model2: {model2_loaded})")
-            self.available = True
-        else:
-            print(f"\n⚠️ No models loaded - service will show live feed only")
-            self.available = False
-    
-    def reload_models(self):
-        """Force reload of YOLO models"""
-        print("\n🔄 Force reloading YOLO models...")
-        self.model1 = None
-        self.model2 = None
-        self._csv_cache.clear()
-        self._initialize_models()
-        return {
-            "success": True,
-            "model1_loaded": self.model1 is not None,
-            "model2_loaded": self.model2 is not None,
-            "available": self.is_available()
+            print(f"Stone error: {e}")
+
+        if largest_box_full:
+            sx1, sy1, sx2, sy2 = largest_box_full
+            try:
+                # Predict Gold
+                if self.model_gold:
+                    res_g = next(self.model_gold.predict(frame, imgsz=self.IMGSZ, conf=self.CONF_THRESH, iou=0.45, stream=True, verbose=False))
+                    rg = res_g[0] if len(res_g) > 0 else None
+                    if rg and rg.masks is not None:
+                        mask = rg.masks.data[0].cpu().numpy()
+                        if mask.ndim == 3:
+                            mask = mask[0]
+                        
+                        # Resize mask to fit frame
+                        gold_mask_full = (mask > 0.5).astype(np.uint8) * 255
+                        gold_mask_resized = cv2.resize(gold_mask_full, (W, H), interpolation=cv2.INTER_NEAREST)
+                        
+                        stone_mask = np.zeros((H, W), dtype=np.uint8)
+                        cv2.rectangle(stone_mask, (sx1, sy1), (sx2, sy2), 255, -1)
+                        
+                        gold_clipped_full = cv2.bitwise_and(gold_mask_resized, stone_mask)
+                        annotated[gold_clipped_full > 0] = self.GOLD_OVERLAY_COLOR
+
+                        stone_area = max(1, (sx2-sx1)*(sy2-sy1))
+                        gold_mask_pct = (gold_clipped_full > 0).sum() / stone_area * 100
+                        stone_bbox = (sx1, sy1, sx2, sy2)
+            except Exception as e:
+                print(f"Gold error: {e}")
+
+        return annotated, {
+            'mask': gold_clipped_full,
+            'mask_pct': gold_mask_pct,
+            'stone_bbox': stone_bbox
         }
-    
-    def is_available(self) -> bool:
-        """Check if purity testing service is available"""
-        return self.available and (self.model1 is not None or self.model2 is not None)
-    
-    def iou(self, box1: List[float], box2: List[float]) -> float:
-        """Calculate Intersection over Union (IoU) between two bounding boxes"""
-        x1, y1 = max(box1[0], box2[0]), max(box1[1], box2[1])
-        x2, y2 = min(box1[2], box2[2]), min(box1[3], box2[3])
-        inter_area = max(0, x2 - x1) * max(0, y2 - y1)
-        union = ((box1[2] - box1[0]) * (box1[3] - box1[1])) + ((box2[2] - box2[0]) * (box2[3] - box2[1])) - inter_area
-        return inter_area / union if union else 0
-    
-    def detect_pairs(self, bboxes: np.ndarray, classes: List[str], target_class1: str, target_class2: str, iou_threshold: float = 0.1) -> List[Tuple[int, int]]:
-        """Detect pairs of target classes based on IoU threshold"""
-        pairs = []
-        indices_class1 = [i for i, c in enumerate(classes) if c == target_class1]
-        indices_class2 = [i for i, c in enumerate(classes) if c == target_class2]
-        
-        for i in indices_class1:
-            for j in indices_class2:
-                if self.iou(bboxes[i], bboxes[j]) > iou_threshold:
-                    pairs.append((i, j))
-        return pairs
-    
-    def run_yolo_with_csv(self, frame: np.ndarray, model, csv_path: str, detection_states: Dict) -> np.ndarray:
-        """Run YOLO detection with CSV task logic and timer tracking"""
-        if not os.path.exists(csv_path):
-            print(f"Warning: CSV file not found: {csv_path}")
-            return frame
-        
-        try:
-            if csv_path in self._csv_cache:
-                tasks = self._csv_cache[csv_path]
-            else:
-                tasks = pd.read_csv(csv_path)
-                self._csv_cache[csv_path] = tasks
 
-            results = model.predict(frame, imgsz=320, conf=0.25, verbose=False, half=False, device='cpu')
-            detections = results[0]
-            boxes = detections.boxes.xyxy.cpu().numpy()
-            class_ids = detections.boxes.cls.cpu().numpy().astype(int)
-            confidences = detections.boxes.conf.cpu().numpy()
-            class_names = model.model.names
-            class_labels = [class_names[i] for i in class_ids]
+    def _compute_rubbing(self, annotated, gold_info):
+        if not gold_info or gold_info['stone_bbox'] is None:
+            return annotated, None, False
+
+        mask = gold_info['mask']
+        stone_bbox = gold_info['stone_bbox']
+        
+        if (mask > 0).sum() == 0:
+            return annotated, None, False
+
+        M = cv2.moments(mask)
+        if M['m00'] == 0:
+            return annotated, None, False
+
+        cx = int(M['m10'] / M['m00'])
+        cy = int(M['m01'] / M['m00'])
+        cv2.circle(annotated, (cx, cy), 5, (0,0,255), -1)
+
+        sx1, sy1, sx2, sy2 = stone_bbox
+        scx = (sx1 + sx2) / 2
+        scy = (sy1 + sy2) / 2
+        dist = np.hypot(cx - scx, cy - scy)
+        
+        self.recent_distances.append(dist)
+
+        visual_ok = False
+        if len(self.recent_distances) >= 3:
+            diffs = np.diff(self.recent_distances)
+            meaningful = np.abs(diffs) >= self.THRESHOLD_OF_FLUCTUATION
+            signs = np.sign(diffs)
+            sign_changes = 0
+            if len(signs) > 0:
+                prev_sign = signs[0]
+                for i in range(1, len(signs)):
+                    s = signs[i]
+                    if meaningful[i] and meaningful[i-1] and s != 0 and prev_sign != 0 and s != prev_sign:
+                        sign_changes += 1
+                    prev_sign = s if s != 0 else prev_sign
+            visual_ok = sign_changes >= self.NO_OF_FLUCTUATIONS
+
+        return annotated, (cx, cy), visual_ok
+
+    def _process_acid_frame(self, frame):
+        annotated = frame.copy()
+        acid_found = False
+        
+        if self.model_acid:
+            try:
+                results = self.model_acid(frame, imgsz=self.IMGSZ, conf=0.8, verbose=False)[0]
+                if results.boxes is not None:
+                    for box in results.boxes:
+                        cls = int(box.cls[0].item())
+                        conf = box.conf[0].item()
+                        if conf > 0.4:
+                            x1, y1, x2, y2 = map(int, box.xyxy[0])
+                            cv2.rectangle(annotated, (x1,y1), (x2,y2), (0,255,255), 3)
+                            cv2.putText(annotated, f"Acid {conf:.2f}", (x1, y1-10),
+                                        cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0,255,255), 2)
+                            acid_found = True
+            except Exception as e:
+                print(f"Acid detection error: {e}")
+
+        return annotated, acid_found
+
+    # ------------------------------------------------------------------ CAMERAS
+    def _init_camera(self, index: int) -> Optional[cv2.VideoCapture]:
+        """Initialize camera with retries and multiple backend fallbacks"""
+        backends = [
+            (cv2.CAP_DSHOW, "DSHOW"),
+            (cv2.CAP_MSMF, "MSMF"),
+            (cv2.CAP_ANY, "ANY"),
+        ]
+        
+        for backend, backend_name in backends:
+            for attempt in range(2):
+                try:
+                    cam = cv2.VideoCapture(index, backend)
+                    if cam.isOpened():
+                        ret, _ = cam.read()
+                        if ret:
+                            cam.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+                            cam.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+                            print(f"  ✓ Camera {index} opened ({backend_name})")
+                            return cam
+                        cam.release()
+                except Exception:
+                    pass
+                time.sleep(0.5)
+        
+        print(f"  ❌ Camera {index} failed")
+        return None
+
+    def _release_cameras(self):
+        """Release all cameras"""
+        for cam, name in ((self.camera1, "cam1"), (self.camera2, "cam2")):
+            if cam and cam.isOpened():
+                cam.release()
+        self.camera1 = None
+        self.camera2 = None
+
+    # ------------------------------------------------------------------ START/STOP
+    def start(self, camera1_index: int = None, camera2_index: int = None):
+        """Start purity testing with cameras"""
+        print("\n🚀 Starting Purity Testing Service...")
+
+        if camera1_index is not None: self.camera1_index = camera1_index
+        if camera2_index is not None: self.camera2_index = camera2_index
+
+        self._release_cameras()
+        time.sleep(0.5)
+
+        self.camera1 = self._init_camera(self.camera1_index)
+        self.camera2 = self._init_camera(self.camera2_index)
+
+        cam1_ok = self.camera1 is not None and self.camera1.isOpened()
+        cam2_ok = self.camera2 is not None and self.camera2.isOpened()
+        
+        if not cam1_ok and not cam2_ok:
+            raise RuntimeError("No cameras could be opened.")
+
+        # Reset state
+        self.is_running = True
+        self.current_task = "rubbing"
+        self.rubbing_confirmed = False
+        self.acid_detected = False
+        self.recent_distances.clear()
+        
+        self.detection_status = {
+            "message": "Detection started – waiting for Rubbing...",
+            "rubbing_detected": False,
+            "acid_detected": False,
+            "current_task": "rubbing",
+            "camera1_active": cam1_ok,
+            "camera2_active": cam2_ok
+        }
+
+        print("✓ Purity Testing Service STARTED")
+        return self.detection_status
+
+    def stop(self):
+        """Stop purity testing"""
+        print("\n🛑 Stopping Purity Testing Service...")
+        self.is_running = False
+        self._release_cameras()
+        self.detection_status["message"] = "Detection stopped."
+        self.detection_status["current_task"] = "stopped"
+        return self.detection_status
+
+    # ------------------------------------------------------------------ MJPEG STREAMING
+    def _generate_frames(self, cam_getter, cam_id: int):
+        """Generate MJPEG frames with specific logic overlay"""
+        while True:
+            cam = cam_getter()
+            if cam is None or not cam.isOpened():
+                placeholder = np.zeros((480, 640, 3), np.uint8)
+                cv2.putText(placeholder, f"Cam {cam_id} OFFLINE", (80, 240),
+                            cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 0, 255), 3)
+                _, buf = cv2.imencode('.jpg', placeholder)
+                yield (b'--frame\r\nContent-Type: image/jpeg\r\n\r\n' + buf.tobytes() + b'\r\n')
+                time.sleep(1.0)
+                continue
+
+            ret, frame = cam.read()
+            if not ret:
+                time.sleep(0.01)
+                continue
+
+            frame = cv2.resize(frame, (640, 480))
             
-            # Debug: Show detection count
-            if len(boxes) > 0:
-                cv2.putText(frame, f"Detections: {len(boxes)}", (10, frame.shape[0] - 10),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 2)
-            
-            # Track which boxes are part of a pair
-            pair_indices = set()
-            active_labels = []
-            
-            for idx, row in tasks.iterrows():
-                t1, t2 = str(row['target1']), str(row['target2'])
-                label = row['label']
-                hold_seconds = float(row.get('hold_seconds', 5))
-                min_fluctuations = int(row.get('min_fluctuations', 3))
-                pairs = self.detect_pairs(boxes, class_labels, t1, t2, iou_threshold=0.05)
-                
-                if pairs:
-                    active_labels.append(label)
-                    for i, j in pairs:
-                        pair_indices.add(i)
-                        pair_indices.add(j)
-                
-                key = (csv_path, label)
-                state = detection_states.setdefault(key, {
-                    "detected_time": None,
-                    "last_detected": False,
-                    "fluctuation_count": 0,
-                })
-                
-                detected_now = bool(pairs)
-                
-                # Fluctuation Logic
-                if detected_now and not state["last_detected"]:
-                    state["fluctuation_count"] += 1
-                state["last_detected"] = detected_now
-                
-                if detected_now and state["detected_time"] is None:
-                    state["detected_time"] = time.time()
-                
-                if state["detected_time"]:
-                    elapsed = time.time() - state["detected_time"]
-                    cv2.putText(frame, f"{label}: {elapsed:.1f}s, fluc:{state['fluctuation_count']}",
-                                (10, 40 + idx * 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
+            # Logic Processing
+            if self.is_running:
+                # Camera 1: Rubbing
+                if cam_id == 1:
+                    cv2.putText(frame, "STAGE 1: GOLD RUBBING", (10, 40), cv2.FONT_HERSHEY_DUPLEX, 0.8, (255,255,255), 2)
                     
-                    if elapsed > hold_seconds:
-                        if state["fluctuation_count"] >= min_fluctuations:
-                            print(f"✅ {label} detected. Moving to next task.")
-                            self.detection_status["message"] = f"{label} detected ✅"
-                            self.detection_status["timestamp"] = datetime.now().isoformat()
-                            cv2.putText(frame, f"{label} DETECTED!", (50, 60 + idx * 40),
-                                        cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 0, 255), 3)
-                            # Reset for next round
-                            state["detected_time"] = None
-                            state["fluctuation_count"] = 0
-                            state["last_detected"] = False
-                        else:
-                            # Not enough fluctuations -> reset
-                            state["detected_time"] = None
-                            state["fluctuation_count"] = 0
-                            state["last_detected"] = False
-            
-            # Final Box Drawing (Move OUTSIDE task loop to avoid overdrawing)
-            h, w = frame.shape[:2]
-            for idx_box, box in enumerate(boxes):
-                # Ensure coordinates are within image boundaries
-                x1, y1, x2, y2 = map(int, box)
-                x1 = max(0, min(x1, w-1))
-                y1 = max(0, min(y1, h-1))
-                x2 = max(0, min(x2, w-1))
-                y2 = max(0, min(y2, h-1))
-                
-                # Check if this detection belongs to NO relevant class? 
-                # (Optional: Filter boxes not mentioned in CSV if needed)
-                
-                is_pair = idx_box in pair_indices
-                color = (0, 0, 255) if is_pair else (0, 255, 0) # Red if pair, Green if single
-                
-                # Draw the rectangle with thicker line
-                cv2.rectangle(frame, (x1, y1), (x2, y2), color, 3)
-                
-                # Draw class label with confidence
-                class_label = class_labels[idx_box]
-                conf_score = confidences[idx_box] if idx_box < len(confidences) else 0.0
-                label_text = f"{class_label} {conf_score:.2f}"
-                
-                # Draw background for text
-                (text_w, text_h), _ = cv2.getTextSize(label_text, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)
-                cv2.rectangle(frame, (x1, y1 - text_h - 10), (x1 + text_w, y1), color, -1)
-                cv2.putText(frame, label_text, (x1, y1 - 5),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
-                
-                # If it's part of a pair, also show the task label (e.g. "Rubbing")
-                if is_pair and active_labels:
-                    cv2.putText(frame, " | ".join(active_labels), (x1, y2 + 20),
-                                cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
-            
-        except Exception as e:
-            print(f"Error in YOLO processing: {e}")
-            cv2.putText(frame, f"Error: {str(e)[:50]}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
-        
-        return frame
-    def run_yolo_analysis_on_frame(self, frame: np.ndarray) -> np.ndarray:
-        """Run YOLO + CSV logic on a single frame and return annotated image"""
-        if not self.is_available():
-            cv2.putText(frame, "YOLO Not Available", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
-            return frame
+                    if self.current_task == "rubbing":
+                        frame, info = self._process_rubbing_frame(frame)
+                        frame, centroid, visual_ok = self._compute_rubbing(frame, info)
+                        
+                        cv2.putText(frame, f"Visual: {'OK' if visual_ok else 'NOT OK'}", (10, 80),
+                                    cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0,255,0) if visual_ok else (0,0,255), 2)
+                        
+                        if visual_ok:
+                            self.rubbing_confirmed = True
+                            self.detection_status["rubbing_detected"] = True
+                            self.detection_status["message"] = "Rubbing Confirmed! Switch to Acid."
+                            self.current_task = "acid"
+                            
+                    elif self.current_task == "acid" or self.current_task == "done":
+                        cv2.putText(frame, "RUBBING COMPLETE", (10, 80), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0,255,0), 2)
 
-        # Use model 1 (or make dynamic)
-        model = self.model1
-        csv_path = self.csv1_path
+                # Camera 2: Acid
+                elif cam_id == 2:
+                    cv2.putText(frame, "STAGE 2: ACID DETECTION", (10, 40), cv2.FONT_HERSHEY_DUPLEX, 0.8, (255,255,255), 2)
+                    
+                    if self.current_task == "acid":
+                        frame, acid_found = self._process_acid_frame(frame)
+                        
+                        status = "ACID DETECTED!" if acid_found else "No Acid Yet"
+                        color = (0,255,0) if acid_found else (0,0,255)
+                        cv2.putText(frame, status, (10, 100), cv2.FONT_HERSHEY_SIMPLEX, 1.0, color, 3)
+                        
+                        if acid_found:
+                            self.acid_detected = True
+                            self.detection_status["acid_detected"] = True
+                            self.detection_status["message"] = "Acid Detected! Test Complete."
+                            self.current_task = "done"
 
-        if model is None or not os.path.exists(csv_path):
-            cv2.putText(frame, "Model/CSV Missing", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
-            return frame
+                    elif self.current_task == "rubbing":
+                        cv2.putText(frame, "WAITING FOR RUBBING...", (10, 100), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0,255,255), 2)
+                    
+                    elif self.current_task == "done":
+                        cv2.putText(frame, "TEST COMPLETE", (10, 100), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0,255,0), 3)
 
-        try:
-            if csv_path in self._csv_cache:
-                tasks = self._csv_cache[csv_path]
-            else:
-                tasks = pd.read_csv(csv_path)
-                self._csv_cache[csv_path] = tasks
+            # Encode and yield frame
+            _, buf = cv2.imencode('.jpg', frame, [int(cv2.IMWRITE_JPEG_QUALITY), 80])
+            if _:
+                yield (b'--frame\r\nContent-Type: image/jpeg\r\n\r\n' + buf.tobytes() + b'\r\n')
+            time.sleep(0.01)
 
-            results = model.predict(frame, imgsz=320, conf=0.3, verbose=False)
-            detections = results[0]
-            boxes = detections.boxes.xyxy.cpu().numpy()
-            class_ids = detections.boxes.cls.cpu().numpy().astype(int)
-            class_names = model.model.names
-            class_labels = [class_names[i] for i in class_ids]
-            
-            for idx, row in tasks.iterrows():
-                t1, t2 = str(row['target1']), str(row['target2'])
-                label = row['label']
-                pairs = self.detect_pairs(boxes, class_labels, t1, t2, iou_threshold=0.05)
+    def video_feed1(self):
+        """MJPEG stream from camera 1 (Top View / Rubbing)"""
+        return StreamingResponse(
+            self._generate_frames(lambda: self.camera1, 1),
+            media_type="multipart/x-mixed-replace; boundary=frame"
+        )
 
-                key = (csv_path, label)
-                state = self.detection_states.setdefault(key, {
-                    "detected_time": None, "last_detected": False, "fluctuation_count": 0
-                })
+    def video_feed2(self):
+        """MJPEG stream from camera 2 (Side View / Acid)"""
+        return StreamingResponse(
+            self._generate_frames(lambda: self.camera2, 2),
+            media_type="multipart/x-mixed-replace; boundary=frame"
+        )
 
-                detected_now = bool(pairs)
-                if detected_now and not state["last_detected"]:
-                    state["fluctuation_count"] += 1
-                state["last_detected"] = detected_now
+    # ------------------------------------------------------------------ ANALYZE FRAMES (for frontend-sent frames)
+    async def analyze_frames(self, frame1_b64: Optional[str] = None, frame2_b64: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Analyze frames for gold rubbing and acid testing.
+        Supports sequential mode: Rubbing first, then Acid on the same or a different stream.
+        """
+        if not self.available:
+            return {"error": "YOLO models not loaded", "rubbing_detected": False, "acid_detected": False}
 
-                if detected_now and state["detected_time"] is None:
-                    state["detected_time"] = time.time()
-
-                if state["detected_time"]:
-                    elapsed = time.time() - state["detected_time"]
-                    cv2.putText(frame, f"{label}: {elapsed:.1f}s fluc:{state['fluctuation_count']}",
-                                (10, 40 + idx * 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
-
-                    hold_seconds = float(row.get('hold_seconds', 5))
-                    min_fluctuations = int(row.get('min_fluctuations', 3))
-                    if elapsed > hold_seconds and state["fluctuation_count"] >= min_fluctuations:
-                        self.detection_status["message"] = f"{label} detected"
-                        self.detection_status["timestamp"] = datetime.now().isoformat()
-                        cv2.putText(frame, f"{label} DETECTED!", (50, 60 + idx * 40),
-                                    cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 0, 255), 3)
-                        state["detected_time"] = None
-                        state["fluctuation_count"] = 0
-                        state["last_detected"] = False
-
-                # Draw boxes
-                for i, box in enumerate(boxes):
-                    x1, y1, x2, y2 = map(int, box)
-                    color = (0, 0, 255) if any(i in pair for pair in pairs) else (0, 255, 0)
-                    cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
-                    cv2.putText(frame, class_labels[i], (x1, y2 + 20),
-                                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
-
-        except Exception as e:
-            cv2.putText(frame, f"Error: {str(e)[:40]}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
-
-        return frame
-
-    def analyze_frames(self, frame1_b64: str = None, frame2_b64: str = None) -> Dict[str, Any]:
-        """Analyze one or two frames sent as base64 from the frontend"""
         results = {
+            "rubbing_detected": False,
+            "acid_detected": False,
             "annotated_frame1": None,
             "annotated_frame2": None,
-            "detection_status": self.get_detection_status(),
-            "model1_status": "ready" if self.model1 else "not_loaded",
-            "model2_status": "ready" if self.model2 else "not_loaded"
+            "model1_status": "ready" if (self.model_gold and self.model_stone) else "ready",
+            "model2_status": "ready" if self.model_acid else "ready",
+            "message": self.detection_status["message"]
         }
 
         try:
-            # Process Frame 1 (Top View / Rubbing)
+            # Stage 1: Rubbing Analysis (Primary stream)
             if frame1_b64:
-                img1_bytes = base64.b64decode(frame1_b64.split(",")[1])
-                nparr1 = np.frombuffer(img1_bytes, np.uint8)
-                frame1 = cv2.imdecode(nparr1, cv2.IMREAD_COLOR)
-                
-                if frame1 is not None:
-                    # print(f"[Frame1] Received frame size: {frame1.shape}")  # Comment out for performance
-                    if self.model1:
-                        # Run YOLO analysis
-                        # print(f"[Frame1] Running YOLO analysis with Model 1...")
-                        annotated1 = self.run_yolo_with_csv(frame1, self.model1, self.csv1_path, self.detection_states)
-                        # print(f"[Frame1] Analysis complete")
-                    else:
-                        # Model not loaded - show live feed with status message
-                        annotated1 = frame1.copy()
-                        cv2.putText(annotated1, "Model 1 Loading...", (10, 30), 
-                                    cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 255), 2)
-                        cv2.putText(annotated1, "LIVE MONITOR", (10, 70), 
-                                    cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
-                    
-                    # Always encode and return the frame
-                    _, buf1 = cv2.imencode('.jpg', annotated1, [int(cv2.IMWRITE_JPEG_QUALITY), 75])
-                    results["annotated_frame1"] = f"data:image/jpeg;base64,{base64.b64encode(buf1).decode()}"
-                    # print(f"[Frame1] Annotated frame encoded and ready")
+                try:
+                    img1_bytes = base64.b64decode(frame1_b64.split(",")[1])
+                    nparr1 = np.frombuffer(img1_bytes, np.uint8)
+                    frame1 = cv2.imdecode(nparr1, cv2.IMREAD_COLOR)
 
-            # Process Frame 2 (Side View / Acid)
+                    if frame1 is not None:
+                        # 1. Rubbing Process
+                        annotated1, info = self._process_rubbing_frame(frame1)
+                        annotated1, centroid, rubbing_ok = self._compute_rubbing(annotated1, info)
+                        
+                        if rubbing_ok and not self.rubbing_confirmed:
+                            self.rubbing_confirmed = True
+                            self.detection_status["rubbing_detected"] = True
+                            self.detection_status["message"] = "Rubbing Confirmed! Waiting for Acid Test..."
+                            self.detection_status["current_task"] = "acid"
+                            print("✅ Rubbing confirmed in backend")
+
+                        # 2. Acid Process (Sequential Mode)
+                        # If frame2 is not provided, we can look for acid on frame1 if rubbing is confirmed
+                        acid_found_on_frame1 = False
+                        if self.rubbing_confirmed:
+                            annotated1, acid_found_on_frame1 = self._process_acid_frame(annotated1)
+                            if acid_found_on_frame1:
+                                if not self.acid_detected:
+                                    self.acid_detected = True
+                                    self.detection_status["acid_detected"] = True
+                                    self.detection_status["message"] = "Acid Detected! Test Complete."
+                                    print("✅ Acid detected in backend (on frame 1)")
+
+                        # Add status indicators to annotated frame
+                        status_text = "RUBBING" if not self.rubbing_confirmed else "ACID TEST"
+                        cv2.putText(annotated1, f"STATUS: {status_text}", (10, 30),
+                                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+                        
+                        # Show live rubbing movement detection
+                        if not self.rubbing_confirmed:
+                           cv2.putText(annotated1, f"Visual: {'OK' if rubbing_ok else 'NOT OK'}", (10, 60),
+                                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0) if rubbing_ok else (0, 0, 255), 2)
+                        
+                        if self.rubbing_confirmed:
+                           cv2.putText(annotated1, "✓ RUBBING OK", (10, 60),
+                                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+                        if self.acid_detected:
+                           cv2.putText(annotated1, "✓ ACID OK", (10, 90),
+                                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+
+                        _, buf1 = cv2.imencode('.jpg', annotated1, [int(cv2.IMWRITE_JPEG_QUALITY), 80])
+                        results["annotated_frame1"] = f"data:image/jpeg;base64,{base64.b64encode(buf1).decode()}"
+                except Exception as e:
+                    print(f"Frame 1 processing error: {e}")
+
+            # Stage 2: Secondary stream for Acid (Optional)
             if frame2_b64:
-                img2_bytes = base64.b64decode(frame2_b64.split(",")[1])
-                nparr2 = np.frombuffer(img2_bytes, np.uint8)
-                frame2 = cv2.imdecode(nparr2, cv2.IMREAD_COLOR)
-                
-                if frame2 is not None:
-                    # print(f"[Frame2] Received frame size: {frame2.shape}")
-                    if self.model2:
-                        # Run YOLO analysis
-                        # print(f"[Frame2] Running YOLO analysis with Model 2...")
-                        annotated2 = self.run_yolo_with_csv(frame2, self.model2, self.csv2_path, self.detection_states)
-                        # print(f"[Frame2] Analysis complete")
-                    else:
-                        # Model not loaded - show live feed with status message
-                        annotated2 = frame2.copy()
-                        cv2.putText(annotated2, "Model 2 Loading...", (10, 30), 
-                                    cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 255), 2)
-                        cv2.putText(annotated2, "SIDE MONITOR", (10, 70), 
-                                    cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
-                    
-                    # Always encode and return the frame
-                    _, buf2 = cv2.imencode('.jpg', annotated2, [int(cv2.IMWRITE_JPEG_QUALITY), 75])
-                    results["annotated_frame2"] = f"data:image/jpeg;base64,{base64.b64encode(buf2).decode()}"
-                    # print(f"[Frame2] Annotated frame encoded and ready")
+                try:
+                    img2_bytes = base64.b64decode(frame2_b64.split(",")[1])
+                    nparr2 = np.frombuffer(img2_bytes, np.uint8)
+                    frame2 = cv2.imdecode(nparr2, cv2.IMREAD_COLOR)
 
-            # Update detection status in results
+                    if frame2 is not None:
+                        annotated2, acid_found = self._process_acid_frame(frame2)
+                        
+                        if acid_found:
+                            if not self.acid_detected:
+                                self.acid_detected = True
+                                self.detection_status["acid_detected"] = True
+                                self.detection_status["message"] = "Acid Detected! Test Complete."
+                                print("✅ Acid detected in backend (on frame 2 stream)")
+                        
+                        # Add Visual Status
+                        status = "ACID DETECTED!" if acid_found else "No Acid"
+                        color = (0, 255, 0) if acid_found else (0, 0, 255)
+                        cv2.putText(annotated2, status, (10, 30),
+                                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, color, 2)
+                        
+                        _, buf2 = cv2.imencode('.jpg', annotated2, [int(cv2.IMWRITE_JPEG_QUALITY), 80])
+                        results["annotated_frame2"] = f"data:image/jpeg;base64,{base64.b64encode(buf2).decode()}"
+                except Exception as e:
+                    print(f"Frame 2 processing error: {e}")
+
+            # Sync flags
+            results["rubbing_detected"] = self.rubbing_confirmed
+            results["acid_detected"] = self.acid_detected
             results["detection_status"] = self.get_detection_status()
-            
-            # Extract specific flags for frontend convenience
-            msg = results["detection_status"]["message"].lower()
-            results["rubbing_detected"] = "rub" in msg and "detected" in msg
-            results["acid_detected"] = "acid" in msg and "detected" in msg
 
         except Exception as e:
             print(f"Error in analyze_frames: {e}")
@@ -496,485 +553,36 @@ class PurityTestingService:
             results["error"] = str(e)
 
         return results
-        
-    def open_camera(self, camera_index: int = 0) -> Optional[cv2.VideoCapture]:
-        """Open camera with error handling - tries multiple backends"""
-        return self._try_open_camera(camera_index)
-    
-    def close_camera(self, cap: cv2.VideoCapture):
-        """Close camera safely"""
-        if cap is not None:
-            cap.release()
-    
-    def capture_frame(self, camera_index: int = 0, model_index: int = 1) -> Optional[str]:
-        """Capture a single frame with purity testing analysis"""
-        if not self.is_available():
-            raise Exception("Purity testing service not available")
-        
-        cap = self.open_camera(camera_index)
-        if cap is None:
-            raise Exception(f"Cannot open camera {camera_index}")
-        
-        try:
-            ret, frame = cap.read()
-            if not ret:
-                raise Exception("Failed to capture frame")
-            
-            # Apply YOLO analysis
-            model = self.model1 if model_index == 1 else self.model2
-            csv_path = self.csv1_path if model_index == 1 else self.csv2_path
-            
-            if model is not None:
-                frame = self.run_yolo_with_csv(frame, model, csv_path, self.detection_states)
-            
-            # Encode frame to base64
-            ret, buffer = cv2.imencode('.jpg', frame)
-            if ret:
-                img_base64 = base64.b64encode(buffer).decode('utf-8')
-                return f"data:image/jpeg;base64,{img_base64}"
-            else:
-                raise Exception("Failed to encode frame")
-                
-        finally:
-            self.close_camera(cap)
-    
-    # def start_continuous_analysis(self, camera_index: int = 0, model_index: int = 1) -> str:
-    #     """Start continuous purity testing analysis"""
-    #     if not self.is_available():
-    #         raise Exception("Purity testing service not available")
-        
-    #     session_id = f"session_{camera_index}_{model_index}_{int(time.time())}"
-        
-    #     # Initialize frame queue for this session
-    #     self._frame_queues[session_id] = queue.Queue(maxsize=10)
-        
-    #     # Start video processing thread
-    #     def video_processor():
-    #         cap = self.open_camera(camera_index)
-    #         if cap is None:
-    #             return
-            
-    #         model = self.model1 if model_index == 1 else self.model2
-    #         csv_path = self.csv1_path if model_index == 1 else self.csv2_path
-    #         local_detection_states = {}
-            
-    #         try:
-    #             while not self._stop_event.is_set():
-    #                 ret, frame = cap.read()
-    #                 if not ret:
-    #                     time.sleep(0.1)
-    #                     continue
-                    
-    #                 # Apply YOLO analysis
-    #                 if model is not None:
-    #                     frame = self.run_yolo_with_csv(frame, model, csv_path, local_detection_states)
-                    
-    #                 # Encode frame
-    #                 ret, buffer = cv2.imencode('.jpg', frame)
-    #                 if ret:
-    #                     img_base64 = base64.b64encode(buffer).decode('utf-8')
-    #                     frame_data = f"data:image/jpeg;base64,{img_base64}"
-                        
-    #                     # Add to queue (non-blocking)
-    #                     try:
-    #                         self._frame_queues[session_id].put_nowait({
-    #                             "frame": frame_data,
-    #                             "timestamp": time.time(),
-    #                             "detection_status": self.detection_status.copy()
-    #                         })
-    #                     except queue.Full:
-    #                         # Remove oldest frame and add new one
-    #                         try:
-    #                             self._frame_queues[session_id].get_nowait()
-    #                             self._frame_queues[session_id].put_nowait({
-    #                                 "frame": frame_data,
-    #                                 "timestamp": time.time(),
-    #                                 "detection_status": self.detection_status.copy()
-    #                             })
-    #                         except queue.Empty:
-    #                             pass
-                    
-    #                 time.sleep(0.033)  # ~30 FPS
-                    
-    #         finally:
-    #             self.close_camera(cap)
-        
-        # # Start thread
-        # thread = threading.Thread(target=video_processor, daemon=True)
-        # thread.start()
-        # self._video_threads[session_id] = thread
-        
-        # return session_id
-    
-    # def get_latest_frame(self, session_id: str) -> Optional[Dict]:
-    #     """Get the latest frame from continuous analysis"""
-    #     if session_id not in self._frame_queues:
-    #         return None
-        
-    #     try:
-    #         return self._frame_queues[session_id].get_nowait()
-    #     except queue.Empty:
-    #         return None
-    
-    # def stop_continuous_analysis(self, session_id: str) -> bool:
-    #     """Stop continuous analysis session"""
-    #     if session_id in self._video_threads:
-    #         # Clean up
-    #         if session_id in self._frame_queues:
-    #             del self._frame_queues[session_id]
-    #         if session_id in self._video_threads:
-    #             del self._video_threads[session_id]
-    #         return True
-    #     return False
-    
-    def get_detection_status(self) -> Dict[str, Any]:
-        """Get current detection status"""
-        status = self.detection_status.copy()
-        status["models_loaded"] = {
-            "model1": self.model1 is not None,
-            "model2": self.model2 is not None
-        }
-        return status
-    
-    def reset_detection_status(self):
-        """Reset detection status"""
-        print("🔄 Resetting detection status...")
-        self.detection_status = {"message": "No detection yet", "timestamp": None}
-        self.detection_states.clear()
-        print("✓ Detection status reset complete")
-    
-    def get_available_cameras(self) -> List[int]:
-        """Get list of available cameras (returns indices only)"""
-        available_cameras = []
-        for i in range(4):  # Check first 4 camera indices
-            cap = self.open_camera(i)
-            if cap is not None:
-                available_cameras.append(i)
-                self.close_camera(cap)
-        return available_cameras
-    
-    def get_camera_details(self) -> List[Dict[str, Any]]:
-        """Get detailed information about available cameras"""
-        camera_details = []
-        
-        for i in range(4):  # Check first 4 camera indices
-            print(f"\nScanning camera {i}...")
-            cap = self._try_open_camera(i)
-            
-            if cap is not None:
-                try:
-                    # Get camera properties
-                    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-                    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-                    fps = int(cap.get(cv2.CAP_PROP_FPS))
-                    backend = cap.getBackendName()
-                    
-                    # Try to read a frame to verify it's working
-                    ret, frame = cap.read()
-                    is_working = ret and frame is not None
-                    
-                    camera_info = {
-                        "index": i,
-                        "name": f"Camera {i}",
-                        "resolution": f"{width}x{height}",
-                        "width": width,
-                        "height": height,
-                        "fps": fps if fps > 0 else 30,
-                        "backend": backend,
-                        "status": "available" if is_working else "detected_but_error",
-                        "is_working": is_working
-                    }
-                    
-                    camera_details.append(camera_info)
-                    print(f"✅ Camera {i}: {width}x{height} @ {fps}fps ({backend})")
-                    
-                except Exception as e:
-                    print(f"⚠️ Camera {i} error getting details: {e}")
-                    camera_details.append({
-                        "index": i,
-                        "name": f"Camera {i}",
-                        "status": "error",
-                        "error": str(e),
-                        "is_working": False
-                    })
-                finally:
-                    self.close_camera(cap)
-            else:
-                print(f"❌ Camera {i} not available")
-        
-        return camera_details
-    
-    def validate_csv_files(self) -> Dict[str, Any]:
-        """Validate CSV task files"""
-        validation = {
-            "csv1": {"exists": False, "valid": False, "path": self.csv1_path},
-            "csv2": {"exists": False, "valid": False, "path": self.csv2_path},
-        }
-        
-        for csv_key, csv_path in [("csv1", self.csv1_path), ("csv2", self.csv2_path)]:
-            if os.path.exists(csv_path):
-                validation[csv_key]["exists"] = True
-                try:
-                    df = pd.read_csv(csv_path)
-                    required_columns = ['target1', 'target2', 'label']
-                    if all(col in df.columns for col in required_columns):
-                        validation[csv_key]["valid"] = True
-                        validation[csv_key]["tasks"] = len(df)
-                    else:
-                        validation[csv_key]["error"] = f"Missing required columns: {required_columns}"
-                except Exception as e:
-                    validation[csv_key]["error"] = str(e)
-        
-        return validation
-    
-    def create_sample_csv_files(self):
-        """Create sample CSV files for testing"""
-        sample_tasks1 = pd.DataFrame({
-            'target1': ['gold', 'sample', 'acid'],
-            'target2': ['acid', 'gold', 'test'],
-            'label': ['Gold-Acid Test', 'Sample Preparation', 'Acid Reaction'],
-            'hold_seconds': [5, 3, 7],
-            'min_fluctuations': [3, 2, 4]
-        })
-        
-        sample_tasks2 = pd.DataFrame({
-            'target1': ['electronic', 'probe', 'result'],
-            'target2': ['probe', 'sample', 'display'],
-            'label': ['Electronic Test', 'Probe Contact', 'Result Reading'],
-            'hold_seconds': [4, 6, 5],
-            'min_fluctuations': [2, 3, 3]
-        })
-        
-        try:
-            sample_tasks1.to_csv(self.csv1_path, index=False)
-            sample_tasks2.to_csv(self.csv2_path, index=False)
-            return {"success": True, "message": "Sample CSV files created"}
-        except Exception as e:
-            return {"success": False, "error": str(e)}
-    
-    # def cleanup(self):
-    #     """Cleanup all resources"""
-    #     self._stop_event.set()
-        
-    #     # Wait for threads to finish
-    #     for thread in self._video_threads.values():
-    #         if thread.is_alive():
-    #             thread.join(timeout=2)
-        
-    #     # Clear all data structures
-    #     self._video_threads.clear()
-    #     self._frame_queues.clear()
-    #     self.detection_states.clear()
-        
-    #     print("✓ Purity testing service cleaned up")
-    
-    def __del__(self):
-        """Cleanup when object is destroyed"""
-        try:
-            if hasattr(self, 'camera1') and self.camera1:
-                self.camera1.release()
-            if hasattr(self, 'camera2') and self.camera2:
-                self.camera2.release()
-        except:
-            pass
-    
-    # ===== NEW METHODS FOR START/STOP/VIDEO FEEDS =====
-    
-    def _try_open_camera(self, index: int) -> Optional[cv2.VideoCapture]:
-        """Try to open camera with multiple backends"""
-        backends = [
-            ("Auto", cv2.CAP_ANY),
-            ("Media Foundation", cv2.CAP_MSMF),
-            ("DirectShow", cv2.CAP_DSHOW),
-        ]
-        
-        for backend_name, backend in backends:
-            try:
-                print(f"  Trying {backend_name} backend...")
-                cap = cv2.VideoCapture(index, backend)
-                
-                # Give it a moment to initialize
-                import time
-                time.sleep(0.5)
-                
-                if cap.isOpened():
-                    # Try to read a frame to verify it works
-                    ret, frame = cap.read()
-                    if ret:
-                        print(f"  ✅ Camera {index} opened with {backend_name}")
-                        return cap
-                    else:
-                        print(f"  ⚠️ Camera opened but can't read frame")
-                        cap.release()
-                else:
-                    cap.release()
-            except Exception as e:
-                print(f"  ❌ {backend_name} failed: {e}")
-        
-        return None
-    
-    def start(self, camera1_index: Optional[int] = None, camera2_index: Optional[int] = None):
-        """Start purity testing cameras
-        
-        Args:
-            camera1_index: Index of first camera (optional, auto-detected if not provided)
-            camera2_index: Index of second camera (optional, auto-detected if not provided)
-        """
-        try:
-            print("Starting purity testing service...")
-            print("\n🔍 Scanning for cameras...")
-            
-            # Get available cameras if not specified
-            if camera1_index is None or camera2_index is None:
-                available_cameras = []
-                for i in range(4):
-                    print(f"\nChecking camera {i}...")
-                    cap = self._try_open_camera(i)
-                    if cap is not None:
-                        available_cameras.append(i)
-                        cap.release()
-                    else:
-                        print(f"Camera {i} not available")
-                
-                if len(available_cameras) < 1:
-                    error_msg = """
-No cameras available. Please:
-1. Check if a camera is connected
-2. Close other apps using the camera (Chrome, Teams, etc.)
-3. Check camera permissions in Windows Settings
-4. Try running: python backend/test_camera.py
 
-See CAMERA_TROUBLESHOOTING.md for more help.
-"""
-                    raise Exception(error_msg)
-                
-                print(f"\n✅ Available cameras: {available_cameras}")
-                
-                # Auto-select cameras if not provided
-                if camera1_index is None:
-                    camera1_index = available_cameras[0]
-                if camera2_index is None:
-                    camera2_index = available_cameras[1] if len(available_cameras) > 1 else available_cameras[0]
-            
-            print(f"\n📹 Using Camera1: {camera1_index}, Camera2: {camera2_index}")
-            
-            print(f"\n📹 Opening camera1 (index {camera1_index})...")
-            self.camera1 = self._try_open_camera(camera1_index)
-            if not self.camera1:
-                raise Exception(f"Failed to open camera {camera1_index}")
-            
-            # Set camera properties
-            self.camera1.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-            self.camera1.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-            self.camera1.set(cv2.CAP_PROP_FPS, 30)
-            print(f"  Camera1 configured: 640x480 @ 30fps")
-            
-            print(f"\n📹 Opening camera2 (index {camera2_index})...")
-            if camera1_index != camera2_index:
-                self.camera2 = self._try_open_camera(camera2_index)
-                if not self.camera2:
-                    print(f"  ⚠️ Warning: Failed to open second camera, using camera1 for both feeds")
-                    self.camera2 = self.camera1
-                else:
-                    self.camera2.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-                    self.camera2.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-                    self.camera2.set(cv2.CAP_PROP_FPS, 30)
-            else:
-                print("Only one camera available, using it for both feeds")
-                self.camera2 = self.camera1
-            
-            self.is_running = True
-            self.current_task = "monitoring"
-            
-            print("✓ Purity testing service started successfully")
-            return {
-                "success": True,
-                "message": "Purity testing started",
-                "cameras": {
-                    "camera1": camera1_index,
-                    "camera2": camera2_index
-                }
-            }
-            
-        except Exception as e:
-            print(f"Error starting purity testing: {e}")
-            if self.camera1:
-                self.camera1.release()
-                self.camera1 = None
-            if self.camera2 and self.camera2 != self.camera1:
-                self.camera2.release()
-                self.camera2 = None
-            raise Exception(f"Failed to start purity testing: {str(e)}")
-    
-    def stop(self):
-        """Stop purity testing cameras"""
-        try:
-            if self.camera1:
-                self.camera1.release()
-                self.camera1 = None
-                print("cam1 released")
-            
-            if self.camera2 and self.camera2 != self.camera1:
-                self.camera2.release()
-                self.camera2 = None
-                print("cam2 released")
-            
-            self.is_running = False
-            self.current_task = None
-            
-            return {"success": True, "message": "Purity testing stopped"}
-        except Exception as e:
-            print(f"Error stopping purity testing: {e}")
-            return {"success": False, "error": str(e)}
-    
-    def video_feed1(self):
-        """Video feed from camera 1 with YOLO analysis"""
-        from fastapi.responses import StreamingResponse
-        
-        def generate():
-            while self.camera1 and self.camera1.isOpened():
-                try:
-                    ret, frame = self.camera1.read()
-                    if not ret:
-                        time.sleep(0.01)
-                        continue
-                    
-                    # Encode frame as JPEG
-                    ret, buffer = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 75])
-                    if ret:
-                        yield (b'--frame\r\n'
-                               b'Content-Type: image/jpeg\r\n\r\n' + buffer.tobytes() + b'\r\n')
-                    
-                    time.sleep(0.066)  # ~15 FPS for stability
-                    
-                except Exception as e:
-                    print(f"Error in video feed 1: {e}")
-                    time.sleep(0.1)
-        
-        return StreamingResponse(generate(), media_type="multipart/x-mixed-replace; boundary=frame")
-    
-    def video_feed2(self):
-        """Video feed from camera 2 with YOLO analysis"""
-        from fastapi.responses import StreamingResponse
-        
-        def generate():
-            while self.camera2 and self.camera2.isOpened():
-                try:
-                    ret, frame = self.camera2.read()
-                    if not ret:
-                        time.sleep(0.01)
-                        continue
-                    
-                    # Encode frame as JPEG
-                    ret, buffer = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 75])
-                    if ret:
-                        yield (b'--frame\r\n'
-                               b'Content-Type: image/jpeg\r\n\r\n' + buffer.tobytes() + b'\r\n')
-                    
-                    time.sleep(0.066)  # ~15 FPS for stability
-                    
-                except Exception as e:
-                    print(f"Error in video feed 2: {e}")
-                    time.sleep(0.1)
-        
-        return StreamingResponse(generate(), media_type="multipart/x-mixed-replace; boundary=frame")
+    # ------------------------------------------------------------------ PUBLIC API
+    def is_available(self) -> bool:
+        return self.available
+
+    def get_available_cameras(self) -> List[Dict[str, Any]]:
+        cams = []
+        for i in range(3):
+            try:
+                cap = cv2.VideoCapture(i, cv2.CAP_DSHOW)
+                if cap.isOpened():
+                    cams.append({"index": i, "resolution": "640x480"})
+                    cap.release()
+            except: pass
+        return cams
+
+    def get_detection_status(self) -> Dict[str, Any]:
+        return self.detection_status.copy()
+
+    def reset_detection_status(self):
+        self.stop()
+
+    def validate_csv_files(self):
+        # Legacy stub
+        return {"valid": True, "rubbing_tasks": 0, "acid_tasks": 0}
+
+    def create_sample_csv_files(self):
+        # Legacy stub
+        return {"success": True, "message": "Not needed for new visual logic"}
+
+    def cleanup(self):
+        self.stop()
+        cv2.destroyAllWindows()

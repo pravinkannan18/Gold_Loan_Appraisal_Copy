@@ -54,8 +54,15 @@ export function PurityTesting() {
   const [jewelleryItems, setJewelleryItems] = useState<JewelleryItem[]>([]);
   const [purityResults, setPurityResults] = useState<PurityResult[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [isRecording, setIsRecording] = useState(false);
+
+  // New: Independent Camera States
+  const [isAnalysisActive, setIsAnalysisActive] = useState(false);
+  const isAnalysisActiveRef = useRef(false);
+
   const [currentRecordingItem, setCurrentRecordingItem] = useState<number | null>(null);
+  const isRecording = isAnalysisActive;
+  const isRecordingRef = { current: isAnalysisActiveRef.current };
+
   const [recordedChunks, setRecordedChunks] = useState<Blob[]>([]);
   const [detectedActivities, setDetectedActivities] = useState<ActivityDetection[]>([]);
   const [qrCodeUrl, setQrCodeUrl] = useState<string>('');
@@ -69,34 +76,37 @@ export function PurityTesting() {
 
   // New: Refs for local video elements used for analysis
   const video1Ref = useRef<HTMLVideoElement>(null);
-  const video2Ref = useRef<HTMLVideoElement>(null);
   const canvas1Ref = useRef<HTMLCanvasElement>(null);
-  const canvas2Ref = useRef<HTMLCanvasElement>(null);
 
   // New: State for annotated frames from backend
   const [annotatedFrame1, setAnnotatedFrame1] = useState<string | null>(null);
-  const [annotatedFrame2, setAnnotatedFrame2] = useState<string | null>(null);
-  const lastFrame1UpdateRef = useRef<number>(Date.now());
-  const lastFrame2UpdateRef = useRef<number>(Date.now());
 
   // New: Streams state
   const stream1Ref = useRef<MediaStream | null>(null);
-  const stream2Ref = useRef<MediaStream | null>(null);
   const previewStream1Ref = useRef<MediaStream | null>(null);
-  const previewStream2Ref = useRef<MediaStream | null>(null);
   const analysisIntervalRef = useRef<number | null>(null);
-  const isRecordingRef = useRef<boolean>(false); // Track recording state for analysis loop
+
+  // Ensure attached video elements are actively playing; some browsers pause streams
+  // when srcObject changes even if autoPlay is set.
+  const ensureVideoPlaying = async (videoElement: HTMLVideoElement | null) => {
+    if (!videoElement) return;
+    try {
+      if (videoElement.paused) {
+        await videoElement.play();
+      }
+    } catch (err) {
+      console.error('Video play failed', err);
+    }
+  };
 
   // Use the camera detection hook for smart auto-detection
   const {
     cameras,
     selectedFaceCam,
-    selectedScanCam,
     permission,
     isLoading: cameraLoading,
     error: cameraError,
     selectFaceCam,
-    selectScanCam,
     resetToAutoSelection,
     testCamera,
     enumerateDevices,
@@ -105,14 +115,14 @@ export function PurityTesting() {
   } = useCameraDetection();
 
   // Camera selection UI state
-  const [showCameraSelection, setShowCameraSelection] = useState(!selectedFaceCam || !selectedScanCam);
+  const [showCameraSelection, setShowCameraSelection] = useState(!selectedFaceCam);
 
   // Sync selection state with panel visibility
   useEffect(() => {
-    if (!selectedFaceCam || !selectedScanCam) {
+    if (!selectedFaceCam) {
       setShowCameraSelection(true);
     }
-  }, [selectedFaceCam, selectedScanCam]);
+  }, [selectedFaceCam]);
 
   // Auto-request camera permission on mount to get device labels
   useEffect(() => {
@@ -152,106 +162,97 @@ export function PurityTesting() {
       navigate('/rbi-compliance');
     }
 
-    // Cleanup function to stop recording and polling when component unmounts
+    // Cleanup function
     return () => {
-      stopVideoRecording();
+      stopAllAnalysis();
     };
   }, [navigate]);
 
   // Refs to CameraSelect components to control their streams
   const faceCamSelectRef = useRef<{ stopPreview: () => void } | null>(null);
-  const scanCamSelectRef = useRef<{ stopPreview: () => void } | null>(null);
 
-  // Start local camera streaming and frontend-driven analysis
-  const startVideoRecording = async (itemNumber: number) => {
+  // Analysis Control
+  const toggleAnalysis = async () => {
+    if (isAnalysisActive) {
+      stopAnalysis();
+    } else {
+      await startAnalysis();
+    }
+  };
+
+  const startAnalysis = async () => {
     try {
-      // Check if cameras are selected
-      if (!selectedFaceCam || !selectedScanCam) {
-        showToast('Please select cameras first', 'error');
-        setShowCameraSelection(true);
+      if (!selectedFaceCam) {
+        showToast('Please select Analysis camera', 'error');
         return;
       }
-
-      // Check camera permission
-      if (permission.status === 'denied') {
-        showToast(permission.error || 'Camera permission denied', 'error');
-        return;
-      }
-
       setIsLoading(true);
 
-      // CRITICAL: Stop preview streams before starting analysis streams
-      // to avoid 'Camera Busy' or 'NotReadableError'
       if (previewStream1Ref.current) {
         previewStream1Ref.current.getTracks().forEach(t => t.stop());
         previewStream1Ref.current = null;
       }
-      if (previewStream2Ref.current) {
-        previewStream2Ref.current.getTracks().forEach(t => t.stop());
-        previewStream2Ref.current = null;
-      }
 
-      console.log('📹 Opening cameras locally...');
-
-      // Open Camera 1 (Top View)
-      const stream1 = await navigator.mediaDevices.getUserMedia({
+      const stream = await navigator.mediaDevices.getUserMedia({
         video: { deviceId: { exact: selectedFaceCam.deviceId }, width: 640, height: 480 }
       });
-      stream1Ref.current = stream1;
-      if (video1Ref.current) video1Ref.current.srcObject = stream1;
-
-      // Open Camera 2 (Side View)
-      if (selectedFaceCam.deviceId !== selectedScanCam.deviceId) {
-        const stream2 = await navigator.mediaDevices.getUserMedia({
-          video: { deviceId: { exact: selectedScanCam.deviceId }, width: 640, height: 480 }
-        });
-        stream2Ref.current = stream2;
-        if (video2Ref.current) video2Ref.current.srcObject = stream2;
-      } else {
-        stream2Ref.current = stream1;
-        if (video2Ref.current) video2Ref.current.srcObject = stream1;
+      stream1Ref.current = stream;
+      if (video1Ref.current) {
+        video1Ref.current.srcObject = stream;
+        await ensureVideoPlaying(video1Ref.current);
       }
 
-      setIsRecording(true);
-      isRecordingRef.current = true; // Set ref immediately for analysis loop
-      setCurrentRecordingItem(itemNumber);
-      setDetectedActivities([]);
-      setRubbingCompleted(false);
-      setAcidCompleted(false);
+      setIsAnalysisActive(true);
+      isAnalysisActiveRef.current = true;
       setAnnotatedFrame1(null);
-      setAnnotatedFrame2(null);
 
-      // Reset backend detection status
-      await fetch(`${BASE_URL}/api/purity/reset_status`, { method: 'POST' });
+      if (!analysisIntervalRef.current) {
+        setTimeout(startAnalysisLoop, 100);
+      }
 
-      console.log('✅ Recording state set to true, starting analysis loop...');
-      
-      // Start analysis loop with a small delay to ensure state is updated
-      setTimeout(() => {
-        startAnalysisLoop();
-      }, 100);
-
-      showToast(`Local analysis started using ${selectedFaceCam.label} and ${selectedScanCam.label}`, 'success');
+      showToast(`Analysis Started: ${selectedFaceCam.label}`, 'success');
     } catch (error) {
-      console.error('Error starting video recording:', error);
-      setIsRecording(false);
-      showToast(error instanceof Error ? error.message : 'Failed to start video recording', 'error');
+      console.error('Error starting analysis:', error);
+      showToast('Failed to start Analysis', 'error');
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Preview management for selected cameras
+  const stopAnalysis = () => {
+    if (stream1Ref.current) {
+      stream1Ref.current.getTracks().forEach(t => t.stop());
+      stream1Ref.current = null;
+    }
+    if (video1Ref.current) video1Ref.current.srcObject = null;
+    setIsAnalysisActive(false);
+    isAnalysisActiveRef.current = false;
+    setAnnotatedFrame1(null);
+  };
+
+
+  const stopAllAnalysis = () => {
+    stopAnalysis();
+    if (analysisIntervalRef.current) {
+      clearTimeout(analysisIntervalRef.current);
+      analysisIntervalRef.current = null;
+    }
+  };
+
+  // Preview management for selected camera
   useEffect(() => {
     const startPreview1 = async () => {
-      if (selectedFaceCam && !isRecording) {
+      if (selectedFaceCam && !isAnalysisActive) {
         try {
           if (previewStream1Ref.current) previewStream1Ref.current.getTracks().forEach(t => t.stop());
           const stream = await navigator.mediaDevices.getUserMedia({
             video: { deviceId: { exact: selectedFaceCam.deviceId }, width: 640, height: 480 }
           });
           previewStream1Ref.current = stream;
-          if (video1Ref.current) video1Ref.current.srcObject = stream;
+          if (video1Ref.current) {
+            video1Ref.current.srcObject = stream;
+            await ensureVideoPlaying(video1Ref.current);
+          }
         } catch (err) {
           console.error("Preview 1 error:", err);
         }
@@ -264,135 +265,63 @@ export function PurityTesting() {
         previewStream1Ref.current = null;
       }
     };
-  }, [selectedFaceCam, isRecording]);
+  }, [selectedFaceCam, isAnalysisActive]);
 
-  useEffect(() => {
-    const startPreview2 = async () => {
-      if (selectedScanCam && !isRecording) {
-        try {
-          if (previewStream2Ref.current) {
-            previewStream2Ref.current.getTracks().forEach(t => t.stop());
-          }
 
-          if (selectedFaceCam?.deviceId === selectedScanCam.deviceId) {
-            if (video2Ref.current) video2Ref.current.srcObject = previewStream1Ref.current;
-            previewStream2Ref.current = previewStream1Ref.current;
-          } else {
-            const stream = await navigator.mediaDevices.getUserMedia({
-              video: { deviceId: { exact: selectedScanCam.deviceId }, width: 640, height: 480 }
-            });
-            previewStream2Ref.current = stream;
-            if (video2Ref.current) video2Ref.current.srcObject = stream;
-          }
-        } catch (err) {
-          console.error("Preview 2 error:", err);
-        }
-      }
-    };
-    startPreview2();
-    return () => {
-      if (previewStream2Ref.current && previewStream2Ref.current !== previewStream1Ref.current) {
-        previewStream2Ref.current.getTracks().forEach(t => t.stop());
-        previewStream2Ref.current = null;
-      }
-    };
-  }, [selectedScanCam, isRecording, selectedFaceCam]);
 
   const startAnalysisLoop = () => {
     if (analysisIntervalRef.current) clearTimeout(analysisIntervalRef.current);
 
     const runAnalysis = async () => {
-      if (!isRecordingRef.current || !stream1Ref.current) {
-        console.log('⚠️ Analysis loop check:', { isRecording: isRecordingRef.current, hasStream: !!stream1Ref.current });
+      const active = isAnalysisActiveRef.current;
+      if (!active) {
+        console.log('⚠️ Analysis loop stopped: Analysis not active');
+        analysisIntervalRef.current = null;
         return;
       }
 
+      // Ensure video is still playing
+      await ensureVideoPlaying(video1Ref.current);
+
       try {
-        const frame1 = captureFrameToB64(video1Ref.current, canvas1Ref.current);
-        const frame2 = captureFrameToB64(video2Ref.current, canvas2Ref.current);
+        const frame1 = isAnalysisActiveRef.current ? captureFrameToB64(video1Ref.current, canvas1Ref.current) : null;
 
-        console.log('📸 Frame capture result:', { 
-          hasFrame1: !!frame1, 
-          hasFrame2: !!frame2,
-          frame1Len: frame1?.length || 0,
-          frame2Len: frame2?.length || 0
-        });
-
-        if (frame1 || frame2) {
-          console.log('🔄 POST /api/purity/analyze');
-          const response = await fetch(`${BASE_URL}/api/purity/analyze`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ frame1, frame2 })
-          });
-
-          console.log('📡 Backend response:', response.status);
-
-          if (response.ok) {
-            const data = await response.json();
-            
-            console.log('📊 Analysis response:', {
-              hasFrame1: !!data.annotated_frame1,
-              hasFrame2: !!data.annotated_frame2,
-              model1Status: data.model1_status,
-              model2Status: data.model2_status,
-              frame1Length: data.annotated_frame1?.length || 0,
-              frame2Length: data.annotated_frame2?.length || 0
+        if (frame1) {
+          try {
+            const response = await fetch(`${BASE_URL}/api/purity/analyze`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ frame1, frame2: null })
             });
-            
-            // Always display frames, even if models are loading
-            if (data.annotated_frame1) {
-              setAnnotatedFrame1(data.annotated_frame1);
-              lastFrame1UpdateRef.current = Date.now();
-              console.log('✅ Frame 1 updated with annotated image');
-            }
-            if (data.annotated_frame2) {
-              setAnnotatedFrame2(data.annotated_frame2);
-              lastFrame2UpdateRef.current = Date.now();
-              console.log('✅ Frame 2 updated with annotated image');
-            }
-            
-            // Show model status if not ready
-            if (data.model1_status === 'not_loaded' || data.model2_status === 'not_loaded') {
-              console.log('Model status:', {
-                model1: data.model1_status,
-                model2: data.model2_status
-              });
-            }
 
-            if (data.rubbing_detected && !rubbingCompleted) {
-              setRubbingCompleted(true);
-              showToast('✅ Rubbing Test Detected!', 'success');
-              setDetectedActivities(prev => [...prev, { activity: 'rubbing', confidence: 0.95, timestamp: Date.now() }]);
+            if (response.ok) {
+              const data = await response.json();
+              if (data.annotated_frame1) setAnnotatedFrame1(data.annotated_frame1);
+
+              if (data.rubbing_detected && !rubbingCompleted) {
+                setRubbingCompleted(true);
+                showToast('✅ Rubbing Test Detected!', 'success');
+                setDetectedActivities(prev => [...prev, { activity: 'rubbing', confidence: 0.95, timestamp: Date.now() }]);
+              }
+              if (data.acid_detected && !acidCompleted) {
+                setAcidCompleted(true);
+                showToast('✅ Acid Test Detected!', 'success');
+                setDetectedActivities(prev => [...prev, { activity: 'acid_testing', confidence: 0.95, timestamp: Date.now() }]);
+              }
             }
-            if (data.acid_detected && !acidCompleted) {
-              setAcidCompleted(true);
-              showToast('✅ Acid Test Detected!', 'success');
-              setDetectedActivities(prev => [...prev, { activity: 'acid_testing', confidence: 0.95, timestamp: Date.now() }]);
-            }
-          } else {
-            console.error('Analysis failed:', response.status, response.statusText);
+          } catch (fetchErr) {
+            console.error('Analysis fetch error:', fetchErr);
           }
         }
       } catch (err) {
         console.error('Analysis loop error:', err);
-        // Continue the loop even on error - don't let one failed frame stop everything
       }
 
-      // Schedule next execution AFTER previous one completes
-      if (isRecordingRef.current) {
-        analysisIntervalRef.current = window.setTimeout(runAnalysis, 500); // ~2 FPS for better stability
-      }
-      
-      // Clear stale annotated frames (older than 2 seconds)
-      const now = Date.now();
-      if (annotatedFrame1 && (now - lastFrame1UpdateRef.current) > 2000) {
-        console.log('⚠️ Frame 1 stale, clearing...');
-        setAnnotatedFrame1(null);
-      }
-      if (annotatedFrame2 && (now - lastFrame2UpdateRef.current) > 2000) {
-        console.log('⚠️ Frame 2 stale, clearing...');
-        setAnnotatedFrame2(null);
+      // Schedule next execution
+      if (isAnalysisActiveRef.current) {
+        analysisIntervalRef.current = window.setTimeout(runAnalysis, 400);
+      } else {
+        analysisIntervalRef.current = null;
       }
     };
 
@@ -413,28 +342,11 @@ export function PurityTesting() {
     return canvas.toDataURL('image/jpeg', 0.6); // Slightly better quality
   };
 
-  // Stop local streaming and analysis
+  // Stop frontend camera streaming and analysis
   const stopVideoRecording = async (showNotification = true) => {
     try {
-      if (analysisIntervalRef.current) {
-        clearInterval(analysisIntervalRef.current);
-        analysisIntervalRef.current = null;
-      }
-
-      if (stream1Ref.current) {
-        stream1Ref.current.getTracks().forEach(track => track.stop());
-        stream1Ref.current = null;
-      }
-      if (stream2Ref.current && stream2Ref.current !== stream1Ref.current) {
-        stream2Ref.current.getTracks().forEach(track => track.stop());
-        stream2Ref.current = null;
-      }
-
-      setIsRecording(false);
-      isRecordingRef.current = false; // Update ref as well
-      setCurrentRecordingItem(null);
-
-      if (showNotification) showToast('Streaming and analysis stopped', 'info');
+      stopAllAnalysis();
+      if (showNotification) showToast('Analysis stopped', 'info');
     } catch (error) {
       console.error('Error stopping analysis:', error);
     }
@@ -788,22 +700,13 @@ export function PurityTesting() {
               </div>
             ) : (
               <div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                <div className="flex justify-center mb-6">
                   {/* Face Camera Selection with Smart Detection */}
                   <CameraSelect
-                    label="📹 Top View Camera (Rubbing Test)"
+                    label="📹 Analysis Camera (Rubbing & Acid)"
                     devices={cameras}
                     selectedDevice={selectedFaceCam}
                     onSelect={selectFaceCam}
-                    onTest={testCamera}
-                  />
-
-                  {/* Scan Camera Selection with Smart Detection */}
-                  <CameraSelect
-                    label="📹 Side View Camera (Acid Test)"
-                    devices={cameras}
-                    selectedDevice={selectedScanCam}
-                    onSelect={selectScanCam}
                     onTest={testCamera}
                   />
                 </div>
@@ -818,8 +721,7 @@ export function PurityTesting() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                     {cameras.map((camera) => {
                       const isSelected =
-                        camera.deviceId === selectedFaceCam?.deviceId ||
-                        camera.deviceId === selectedScanCam?.deviceId;
+                        camera.deviceId === selectedFaceCam?.deviceId;
 
                       return (
                         <div
@@ -879,425 +781,377 @@ export function PurityTesting() {
           <div className="p-10 space-y-8">
             {/* Backend-Powered Dual Camera Analysis */}
             <div className="bg-gradient-to-br from-blue-50 via-indigo-50 to-sky-50 border-2 border-blue-200/60 rounded-2xl p-8 shadow-lg">
-              <h3 className="text-2xl font-bold text-blue-900 mb-6 tracking-wide">Backend-Powered Dual Camera Analysis</h3>
+              <h3 className="text-2xl font-bold text-blue-900 mb-6 tracking-wide">Backend-Powered Purity Analysis</h3>
 
-              {/* Start/Stop Controls */}
-              <div className="mb-6 flex flex-col items-center gap-3">
-                {selectedFaceCam && selectedScanCam && (
+              <div className="flex flex-col items-center gap-3">
+                {selectedFaceCam && (
                   <div className="text-sm text-blue-700 bg-blue-100 px-4 py-2 rounded-lg font-semibold flex items-center gap-2">
-                    <div className="w-2 h-2 bg-blue-600 rounded-full animate-pulse"></div>
-                    Using {selectedFaceCam.label} (Top) & {selectedScanCam.label} (Side)
+                    <div className={`${isAnalysisActive ? 'bg-green-600 animate-pulse' : 'bg-blue-600'} w-2 h-2 rounded-full`}></div>
+                    Using {selectedFaceCam.label}
                   </div>
                 )}
-                {!isRecording ? (
-                  <Button
-                    onClick={() => startVideoRecording(1)}
-                    disabled={!selectedFaceCam || !selectedScanCam || permission.status === 'denied'}
-                    className="bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white font-semibold px-8 py-4 rounded-xl shadow-lg transition-all duration-300 hover:shadow-xl text-lg disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <Play className="w-6 h-6 mr-3" />
-                    {!selectedFaceCam || !selectedScanCam
-                      ? 'Select Cameras First'
-                      : permission.status === 'denied'
-                        ? 'Camera Permission Denied'
-                        : 'Start Backend Analysis'}
-                  </Button>
-                ) : (
-                  <Button
-                    onClick={() => stopVideoRecording()}
-                    className="bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 text-white font-semibold px-8 py-4 rounded-xl shadow-lg transition-all duration-300 hover:shadow-xl text-lg"
-                  >
-                    <Square className="w-6 h-6 mr-3" />
-                    Stop Analysis
-                  </Button>
-                )}
+                <p className="text-sm text-blue-600 italic">Start analysis stream to detect Rubbing and Acid tests</p>
               </div>
+            </div>
 
-              {/* Frontend-Driven Dual Camera Analysis */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-                {/* Primary Analysis Camera */}
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h4 className="text-lg font-bold text-blue-800">📹 Top View Analysis (Rubbing Test)</h4>
-                    <div className={`w-3 h-3 rounded-full ${isRecording ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`}></div>
-                  </div>
-                  <div className={`relative ${isRecording ? 'ring-4 ring-emerald-500 ring-opacity-50' : ''} rounded-xl overflow-hidden bg-slate-900 border-2 border-blue-200`}>
-                    {/* Video for capture/preview */}
-                    <video
-                      ref={video1Ref}
-                      autoPlay
-                      playsInline
-                      muted
-                      className={`w-full h-96 object-cover ${annotatedFrame1 && isRecording ? 'hidden' : 'block'}`}
-                    />
-                    <canvas ref={canvas1Ref} className="hidden" />
-
-                    {/* Display annotated frame */}
-                    {annotatedFrame1 && isRecording && (
-                      <img
-                        src={annotatedFrame1}
-                        alt="Top View Annotated"
-                        className="w-full h-96 object-cover"
-                      />
-                    )}
-
-                    {!selectedFaceCam && (
-                      <div className="absolute inset-0 flex flex-col items-center justify-center text-blue-300 bg-slate-900/80">
-                        <ScanLine className="w-12 h-12 mb-2 opacity-20" />
-                        <p className="text-sm">Select Top View Camera</p>
-                      </div>
-                    )}
-
-                    {isRecording && (
-                      <div className="absolute top-2 right-2 bg-emerald-600/80 backdrop-blur-sm text-white px-3 py-1 rounded-lg text-xs font-bold flex items-center">
-                        <div className="w-2 h-2 bg-red-500 rounded-full mr-2 animate-pulse"></div>
-                        LIVE ANALYSIS
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Secondary Monitor Camera */}
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h4 className="text-lg font-bold text-blue-800">📹 Side View Analysis (Acid Test)</h4>
-                    <div className={`w-3 h-3 rounded-full ${isRecording ? 'bg-blue-500 animate-pulse' : 'bg-gray-400'}`}></div>
-                  </div>
-                  <div className={`relative rounded-xl overflow-hidden bg-slate-900 border-2 border-blue-200 ${!isRecording ? 'opacity-75' : ''}`}>
-                    {/* Video for capture/preview */}
-                    <video
-                      ref={video2Ref}
-                      autoPlay
-                      playsInline
-                      muted
-                      className={`w-full h-96 object-cover ${annotatedFrame2 && isRecording ? 'hidden' : 'block'}`}
-                    />
-                    <canvas ref={canvas2Ref} className="hidden" />
-
-                    {/* Display annotated frame */}
-                    {annotatedFrame2 && isRecording && (
-                      <img
-                        src={annotatedFrame2}
-                        alt="Side View Annotated"
-                        className="w-full h-96 object-cover"
-                      />
-                    )}
-
-                    {!selectedScanCam && (
-                      <div className="absolute inset-0 flex flex-col items-center justify-center text-blue-300 bg-slate-900/80">
-                        <ScanLine className="w-12 h-12 mb-2 opacity-20" />
-                        <p className="text-sm">Select Side View Camera</p>
-                      </div>
-                    )}
-
-                    <div className="absolute top-2 right-2 bg-blue-600/80 backdrop-blur-sm text-white px-2 py-1 rounded-lg text-[10px] font-bold">
-                      SIDE MONITOR
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Activity Detection Results */}
+            {/* Frontend Camera + Backend YOLO Detection */}
+            <div className="max-w-4xl mx-auto mb-6">
+              {/* Primary Analysis Stream */}
               <div className="space-y-4">
-                <h4 className="text-xl font-bold text-blue-800 tracking-wide">🔍 Detected Activities</h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-3 max-h-64 overflow-y-auto bg-white/60 rounded-xl p-4 border border-blue-200">
-                    <h5 className="font-semibold text-blue-700">Recent Activities</h5>
-                    {detectedActivities.length === 0 ? (
-                      <p className="text-blue-600 text-sm italic">Start recording to detect activities...</p>
-                    ) : (
-                      detectedActivities.map((activity, index) => (
-                        <div key={index} className="flex items-center gap-3 p-3 bg-white backdrop-blur-sm rounded-lg border border-blue-200/50 shadow-sm">
-                          <AlertCircle className="w-4 h-4 text-blue-600 flex-shrink-0" />
-                          <div className="flex-1">
-                            <span className="font-semibold text-blue-900 text-sm">
-                              {activity.activity === 'rubbing' ? 'Rubbing Activity' : 'Acid Testing Activity'}
-                            </span>
-                            <div className="text-xs text-blue-600">
-                              {new Date(activity.timestamp).toLocaleTimeString()}
-                            </div>
-                          </div>
-                          <span className="text-xs text-blue-600 font-medium bg-blue-100 px-2 py-1 rounded-lg">
-                            {(activity.confidence * 100).toFixed(1)}%
-                          </span>
-                        </div>
-                      ))
-                    )}
-                  </div>
-
-                  <div className="space-y-3 bg-white/60 rounded-xl p-4 border border-blue-200">
-                    <h5 className="font-semibold text-blue-700">🔄 System Status</h5>
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between text-sm">
-                        <span>Analysis Camera:</span>
-                        <span className={`font-semibold ${isRecording ? 'text-green-600' : 'text-red-600'}`}>
-                          {isRecording ? '🟢 Streaming' : '🔴 Idle'}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between text-sm">
-                        <span>Monitor Camera:</span>
-                        <span className={`font-semibold ${isRecording ? 'text-green-600' : 'text-red-600'}`}>
-                          {isRecording ? '🟢 Streaming' : '🔴 Idle'}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between text-sm">
-                        <span>Live Analysis:</span>
-                        <span className={`font-semibold ${isRecording ? 'text-emerald-600' : 'text-gray-600'}`}>
-                          {isRecording ? '🔴 LIVE' : '⏸️ Stopped'}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between text-sm">
-                        <span>Rubbing:</span>
-                        <span className={`font-semibold ${rubbingCompleted ? 'text-green-600' : 'text-gray-600'}`}>
-                          {rubbingCompleted ? '✅ Completed' : '⏳ Pending'}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between text-sm">
-                        <span>Acid Testing:</span>
-                        <span className={`font-semibold ${acidCompleted ? 'text-green-600' : 'text-gray-600'}`}>
-                          {acidCompleted ? '✅ Completed' : '⏳ Pending'}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between text-sm">
-                        <span>Detections:</span>
-                        <span className="font-semibold text-blue-600">
-                          {detectedActivities.length} activities
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Detection Notifications */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
-                {/* Rubbing Test Notification */}
-                <div className={`p-6 rounded-xl border-2 transition-all duration-500 ${rubbingCompleted
-                  ? 'bg-gradient-to-br from-emerald-50 to-green-50 border-emerald-400 shadow-lg'
-                  : 'bg-white/40 border-gray-300 opacity-50'
-                  }`}>
-                  <div className="flex items-center gap-4">
-                    <div className={`p-4 rounded-full ${rubbingCompleted ? 'bg-emerald-500' : 'bg-gray-400'
-                      }`}>
-                      <Check className="w-8 h-8 text-white" />
-                    </div>
-                    <div className="flex-1">
-                      <h4 className={`text-xl font-bold ${rubbingCompleted ? 'text-emerald-800' : 'text-gray-600'
-                        }`}>
-                        Rubbing Test {rubbingCompleted ? 'Detected ✓' : 'Pending'}
-                      </h4>
-                      <p className={`text-sm font-medium mt-1 ${rubbingCompleted ? 'text-emerald-700' : 'text-gray-500'
-                        }`}>
-                        {rubbingCompleted
-                          ? 'Stone rubbing activity successfully detected and completed!'
-                          : 'Waiting for stone rubbing activity...'}
-                      </p>
-                    </div>
-                  </div>
-                  {rubbingCompleted && (
-                    <div className="mt-4 pt-4 border-t border-emerald-300">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-emerald-700 font-semibold">Status:</span>
-                        <span className="bg-emerald-600 text-white px-3 py-1 rounded-full text-xs font-bold">
-                          COMPLETED
-                        </span>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Acid Test Notification */}
-                <div className={`p-6 rounded-xl border-2 transition-all duration-500 ${acidCompleted
-                  ? 'bg-gradient-to-br from-blue-50 to-sky-50 border-blue-400 shadow-lg'
-                  : 'bg-white/40 border-gray-300 opacity-50'
-                  }`}>
-                  <div className="flex items-center gap-4">
-                    <div className={`p-4 rounded-full ${acidCompleted ? 'bg-blue-500' : 'bg-gray-400'
-                      }`}>
-                      <Check className="w-8 h-8 text-white" />
-                    </div>
-                    <div className="flex-1">
-                      <h4 className={`text-xl font-bold ${acidCompleted ? 'text-blue-800' : 'text-gray-600'
-                        }`}>
-                        Acid Test {acidCompleted ? 'Detected ✓' : 'Pending'}
-                      </h4>
-                      <p className={`text-sm font-medium mt-1 ${acidCompleted ? 'text-blue-700' : 'text-gray-500'
-                        }`}>
-                        {acidCompleted
-                          ? 'Acid testing activity successfully detected and completed!'
-                          : 'Waiting for acid testing activity...'}
-                      </p>
-                    </div>
-                  </div>
-                  {acidCompleted && (
-                    <div className="mt-4 pt-4 border-t border-blue-300">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-blue-700 font-semibold">Status:</span>
-                        <span className="bg-blue-600 text-white px-3 py-1 rounded-full text-xs font-bold">
-                          COMPLETED
-                        </span>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Jewellery Items Section - REMOVED as per requirements */}
-          </div>
-
-          {/* QR Code Actions */}
-          <div className="p-6 bg-gradient-to-br from-indigo-50 via-blue-50 to-sky-50 border-t-2 border-blue-200/50">
-            <h3 className="text-xl font-bold text-blue-900 mb-4 flex items-center gap-2">
-              <QrCode className="w-6 h-6" />
-              QR Code Operations
-            </h3>
-            <div className="flex flex-wrap gap-4">
-              <Button
-                onClick={generateQRCode}
-                disabled={!rubbingCompleted && !acidCompleted}
-                className="flex-1 min-w-[200px] bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold py-4 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <QrCode className="w-5 h-5" />
-                Generate QR Code
-              </Button>
-              <Button
-                onClick={startQRScanner}
-                variant="outline"
-                className="flex-1 min-w-[200px] border-2 border-blue-600 text-blue-700 hover:bg-blue-50 font-semibold py-4 rounded-xl shadow-md hover:shadow-lg transition-all duration-300 flex items-center justify-center gap-2"
-              >
-                <ScanLine className="w-5 h-5" />
-                Scan QR Code
-              </Button>
-            </div>
-            <p className="text-sm text-blue-600 mt-3 text-center font-medium">
-              Generate a QR code with all appraisal data or scan an existing QR code to view details
-            </p>
-          </div>
-
-          {/* QR Code Modal */}
-          {showQrCode && (
-            <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-              <div className="bg-white/95 backdrop-blur-sm rounded-2xl p-8 max-w-md w-full shadow-2xl border border-blue-200">
-                <h3 className="text-2xl font-bold mb-6 text-blue-900 text-center tracking-wide">Complete Appraisal QR Code</h3>
-                <div className="flex justify-center mb-6">
-                  <img src={qrCodeUrl} alt="QR Code" className="w-64 h-64 rounded-xl shadow-lg" />
-                </div>
-                <p className="text-sm text-blue-700 mb-6 leading-relaxed font-medium text-center">
-                  Scan this QR code to view all appraisal information including appraiser details,
-                  RBI compliance images, jewellery items, and purity test results.
-                </p>
-                <div className="flex flex-col gap-3">
-                  <div className="flex gap-3">
-                    <Button onClick={() => setShowQrCode(false)} variant="outline" className="flex-1 border-2 border-blue-200 text-blue-700 hover:bg-blue-50 font-semibold py-3 rounded-xl">
-                      Close
-                    </Button>
+                <div className="flex items-center justify-between">
+                  <h4 className="text-lg font-bold text-blue-800">📸 Purity Analysis Stream</h4>
+                  <div className="flex items-center gap-2">
                     <Button
-                      onClick={() => {
-                        const link = document.createElement('a');
-                        link.href = qrCodeUrl;
-                        link.download = 'appraisal-qr-code.png';
-                        link.click();
-                        showToast('QR Code image downloaded!', 'success');
-                      }}
-                      className="flex-1 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 font-semibold py-3 rounded-xl shadow-lg flex items-center justify-center gap-2"
+                      onClick={toggleAnalysis}
+                      size="default"
+                      disabled={!selectedFaceCam}
+                      className={isAnalysisActive
+                        ? "bg-red-500 hover:bg-red-600 text-white px-6 py-2 h-auto"
+                        : "bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2 h-auto"
+                      }
                     >
-                      <Download className="w-4 h-4" />
-                      PNG
+                      {isAnalysisActive ? <><Square className="w-4 h-4 mr-2" /> Stop Analysis</> : <><Play className="w-4 h-4 mr-2" /> Start Analysis</>}
                     </Button>
+                    <div className={`w-3 h-3 rounded-full ${isAnalysisActive ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`}></div>
                   </div>
-                  <Button
-                    onClick={downloadQRCodeAsPDF}
-                    className="w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 font-semibold py-3 rounded-xl shadow-lg flex items-center justify-center gap-2"
-                  >
-                    <FileDown className="w-5 h-5" />
-                    Download as PDF
-                  </Button>
+                </div>
+                <div className={`relative ${isAnalysisActive ? 'ring-4 ring-emerald-500 ring-opacity-50' : ''} rounded-2xl overflow-hidden bg-slate-900 border-2 border-blue-200 aspect-video`}>
+                  {/* Video element - always visible for camera capture */}
+                  <video
+                    ref={video1Ref}
+                    autoPlay
+                    playsInline
+                    muted
+                    className="w-full h-full object-cover"
+                  />
+                  <canvas ref={canvas1Ref} className="hidden" />
+
+                  {/* Annotated frame overlay from backend */}
+                  {annotatedFrame1 && isAnalysisActive && (
+                    <img
+                      src={annotatedFrame1}
+                      alt="Analysis Stream"
+                      className="absolute inset-0 w-full h-full object-cover z-10"
+                    />
+                  )}
+
+                  {!selectedFaceCam && (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center text-blue-300 bg-slate-900/80">
+                      <ScanLine className="w-16 h-16 mb-2 opacity-20" />
+                      <p className="text-lg">Select Analysis Camera Above</p>
+                    </div>
+                  )}
+
+                  {!isAnalysisActive && selectedFaceCam && (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center text-blue-200 bg-slate-950/40 backdrop-blur-[2px]">
+                      <p className="text-lg font-semibold bg-slate-900/80 px-6 py-3 rounded-full border border-blue-500/30 shadow-xl">Camera Idle - Ready to Analyze</p>
+                    </div>
+                  )}
+
+                  {isAnalysisActive && (
+                    <div className="absolute top-4 right-4 bg-emerald-600/90 backdrop-blur-md text-white px-4 py-2 rounded-xl text-sm font-bold flex items-center z-20 shadow-lg border border-white/20">
+                      <div className="w-2.5 h-2.5 bg-red-500 rounded-full mr-2.5 animate-pulse"></div>
+                      YOLO LIVE ANALYSIS
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
-          )}
 
-          {/* QR Scanner Modal */}
-          {showQrScanner && (
-            <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-              <div className="bg-white/95 backdrop-blur-sm rounded-2xl p-8 max-w-2xl w-full shadow-2xl border border-blue-200">
-                <h3 className="text-2xl font-bold mb-6 text-blue-900 text-center tracking-wide flex items-center justify-center gap-3">
-                  <ScanLine className="w-8 h-8 text-blue-600 animate-pulse" />
-                  Scan QR Code
-                </h3>
+            {/* Activity Detection Results */}
+            <div className="space-y-4">
+              <h4 className="text-xl font-bold text-blue-800 tracking-wide">🔍 Detected Activities</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-3 max-h-64 overflow-y-auto bg-white/60 rounded-xl p-4 border border-blue-200">
+                  <h5 className="font-semibold text-blue-700">Recent Activities</h5>
+                  {detectedActivities.length === 0 ? (
+                    <p className="text-blue-600 text-sm italic">Activate cameras to begin detection...</p>
+                  ) : (
+                    detectedActivities.map((activity, index) => (
+                      <div key={index} className="flex items-center gap-3 p-3 bg-white backdrop-blur-sm rounded-lg border border-blue-200/50 shadow-sm">
+                        <AlertCircle className="w-4 h-4 text-blue-600 flex-shrink-0" />
+                        <div className="flex-1">
+                          <span className="font-semibold text-blue-900 text-sm">
+                            {activity.activity === 'rubbing' ? 'Rubbing Activity' : 'Acid Testing Activity'}
+                          </span>
+                          <div className="text-xs text-blue-600">
+                            {new Date(activity.timestamp).toLocaleTimeString()}
+                          </div>
+                        </div>
+                        <span className="text-xs text-blue-600 font-medium bg-blue-100 px-2 py-1 rounded-lg">
+                          {(activity.confidence * 100).toFixed(1)}%
+                        </span>
+                      </div>
+                    ))
+                  )}
+                </div>
 
-                <div className="relative mb-6">
-                  <video
-                    ref={qrScannerVideoRef}
-                    className="w-full rounded-xl shadow-lg"
-                    playsInline
-                  />
-                  <canvas ref={qrScannerCanvasRef} className="hidden" />
-
-                  {/* Scanner overlay */}
-                  <div className="absolute inset-0 pointer-events-none">
-                    <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-64 h-64 border-4 border-blue-500 rounded-xl">
-                      <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-blue-600 rounded-tl-xl"></div>
-                      <div className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-blue-600 rounded-tr-xl"></div>
-                      <div className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-blue-600 rounded-bl-xl"></div>
-                      <div className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-blue-600 rounded-br-xl"></div>
+                <div className="space-y-3 bg-white/60 rounded-xl p-4 border border-blue-200">
+                  <h5 className="font-semibold text-blue-700">🔄 System Status</h5>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span>Analysis Stream:</span>
+                      <span className={`font-semibold ${isAnalysisActive ? 'text-green-600' : 'text-red-600'}`}>
+                        {isAnalysisActive ? '🟢 Streaming' : '🔴 Idle'}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span>Live Analysis:</span>
+                      <span className={`font-semibold ${isAnalysisActive ? 'text-emerald-600' : 'text-gray-600'}`}>
+                        {isAnalysisActive ? '🔴 LIVE' : '⏸️ Stopped'}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span>Rubbing:</span>
+                      <span className={`font-semibold ${rubbingCompleted ? 'text-green-600' : 'text-gray-600'}`}>
+                        {rubbingCompleted ? '✅ Completed' : '⏳ Pending'}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span>Acid Testing:</span>
+                      <span className={`font-semibold ${acidCompleted ? 'text-green-600' : 'text-gray-600'}`}>
+                        {acidCompleted ? '✅ Completed' : '⏳ Pending'}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span>Detections:</span>
+                      <span className="font-semibold text-blue-600">
+                        {detectedActivities.length} activities
+                      </span>
                     </div>
                   </div>
                 </div>
+              </div>
+            </div>
 
-                {scannedData && (
-                  <div className="mb-6 p-4 bg-green-50 border-2 border-green-200 rounded-xl">
-                    <h4 className="font-bold text-green-900 mb-2">Scanned Data:</h4>
-                    <pre className="text-sm text-green-800 whitespace-pre-wrap">{JSON.stringify(scannedData, null, 2)}</pre>
+            {/* Detection Notifications */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+              {/* Rubbing Test Notification */}
+              <div className={`p-6 rounded-xl border-2 transition-all duration-500 ${rubbingCompleted
+                ? 'bg-gradient-to-br from-emerald-50 to-green-50 border-emerald-400 shadow-lg'
+                : 'bg-white/40 border-gray-300 opacity-50'
+                }`}>
+                <div className="flex items-center gap-4">
+                  <div className={`p-4 rounded-full ${rubbingCompleted ? 'bg-emerald-500' : 'bg-gray-400'
+                    }`}>
+                    <Check className="w-8 h-8 text-white" />
+                  </div>
+                  <div className="flex-1">
+                    <h4 className={`text-xl font-bold ${rubbingCompleted ? 'text-emerald-800' : 'text-gray-600'
+                      }`}>
+                      Rubbing Test {rubbingCompleted ? 'Detected ✓' : 'Pending'}
+                    </h4>
+                    <p className={`text-sm font-medium mt-1 ${rubbingCompleted ? 'text-emerald-700' : 'text-gray-500'
+                      }`}>
+                      {rubbingCompleted
+                        ? 'Stone rubbing activity successfully detected and completed!'
+                        : 'Waiting for stone rubbing activity...'}
+                    </p>
+                  </div>
+                </div>
+                {rubbingCompleted && (
+                  <div className="mt-4 pt-4 border-t border-emerald-300">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-emerald-700 font-semibold">Status:</span>
+                      <span className="bg-emerald-600 text-white px-3 py-1 rounded-full text-xs font-bold">
+                        COMPLETED
+                      </span>
+                    </div>
                   </div>
                 )}
+              </div>
 
-                <div className="space-y-3">
-                  <div className="text-center">
-                    <label className="cursor-pointer inline-block">
-                      <span className="px-6 py-3 bg-blue-100 text-blue-700 rounded-xl font-semibold hover:bg-blue-200 transition-colors inline-flex items-center gap-2">
-                        <QrCode className="w-5 h-5" />
-                        Upload QR Code Image
-                      </span>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={handleQRFileUpload}
-                        className="hidden"
-                      />
-                    </label>
+              {/* Acid Test Notification */}
+              <div className={`p-6 rounded-xl border-2 transition-all duration-500 ${acidCompleted
+                ? 'bg-gradient-to-br from-blue-50 to-sky-50 border-blue-400 shadow-lg'
+                : 'bg-white/40 border-gray-300 opacity-50'
+                }`}>
+                <div className="flex items-center gap-4">
+                  <div className={`p-4 rounded-full ${acidCompleted ? 'bg-blue-500' : 'bg-gray-400'
+                    }`}>
+                    <Check className="w-8 h-8 text-white" />
                   </div>
-
-                  <Button
-                    onClick={stopQRScanner}
-                    variant="outline"
-                    className="w-full border-2 border-red-200 text-red-700 hover:bg-red-50 font-semibold py-3 rounded-xl"
-                  >
-                    Close Scanner
-                  </Button>
+                  <div className="flex-1">
+                    <h4 className={`text-xl font-bold ${acidCompleted ? 'text-blue-800' : 'text-gray-600'
+                      }`}>
+                      Acid Test {acidCompleted ? 'Detected ✓' : 'Pending'}
+                    </h4>
+                    <p className={`text-sm font-medium mt-1 ${acidCompleted ? 'text-blue-700' : 'text-gray-500'
+                      }`}>
+                      {acidCompleted
+                        ? 'Acid testing activity successfully detected and completed!'
+                        : 'Waiting for acid testing activity...'}
+                    </p>
+                  </div>
                 </div>
+                {acidCompleted && (
+                  <div className="mt-4 pt-4 border-t border-blue-300">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-blue-700 font-semibold">Status:</span>
+                      <span className="bg-blue-600 text-white px-3 py-1 rounded-full text-xs font-bold">
+                        COMPLETED
+                      </span>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
-          )}
-
-          <div className="bg-gradient-to-r from-blue-100 to-indigo-100 px-10 py-8 flex justify-between border-t border-blue-200/50">
-            <button
-              onClick={() => navigate('/rbi-compliance')}
-              className="px-8 py-4 bg-white/80 hover:bg-white text-blue-700 rounded-2xl font-bold transition-all duration-300 flex items-center gap-3 shadow-lg hover:shadow-xl border border-blue-200"
-            >
-              <ArrowLeft className="w-6 h-6" />
-              Back
-            </button>
-            <button
-              onClick={handleNext}
-              disabled={isLoading || !allItemsTested()}
-              className="px-8 py-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-2xl font-bold transition-all duration-300 shadow-xl hover:shadow-2xl flex items-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isLoading ? 'Saving...' : 'Next Step'}
-              <ArrowRight className="w-6 h-6" />
-            </button>
           </div>
+
+          {/* Jewellery Items Section - REMOVED as per requirements */}
+        </div>
+
+        {/* QR Code Actions */}
+        <div className="p-6 bg-gradient-to-br from-indigo-50 via-blue-50 to-sky-50 border-t-2 border-blue-200/50">
+          <h3 className="text-xl font-bold text-blue-900 mb-4 flex items-center gap-2">
+            <QrCode className="w-6 h-6" />
+            QR Code Operations
+          </h3>
+          <div className="flex flex-wrap gap-4">
+            <Button
+              onClick={generateQRCode}
+              disabled={!rubbingCompleted && !acidCompleted}
+              className="flex-1 min-w-[200px] bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold py-4 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <QrCode className="w-5 h-5" />
+              Generate QR Code
+            </Button>
+            <Button
+              onClick={startQRScanner}
+              variant="outline"
+              className="flex-1 min-w-[200px] border-2 border-blue-600 text-blue-700 hover:bg-blue-50 font-semibold py-4 rounded-xl shadow-md hover:shadow-lg transition-all duration-300 flex items-center justify-center gap-2"
+            >
+              <ScanLine className="w-5 h-5" />
+              Scan QR Code
+            </Button>
+          </div>
+          <p className="text-sm text-blue-600 mt-3 text-center font-medium">
+            Generate a QR code with all appraisal data or scan an existing QR code to view details
+          </p>
+        </div>
+
+        {/* QR Code Modal */}
+        {showQrCode && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="bg-white/95 backdrop-blur-sm rounded-2xl p-8 max-w-md w-full shadow-2xl border border-blue-200">
+              <h3 className="text-2xl font-bold mb-6 text-blue-900 text-center tracking-wide">Complete Appraisal QR Code</h3>
+              <div className="flex justify-center mb-6">
+                <img src={qrCodeUrl} alt="QR Code" className="w-64 h-64 rounded-xl shadow-lg" />
+              </div>
+              <p className="text-sm text-blue-700 mb-6 leading-relaxed font-medium text-center">
+                Scan this QR code to view all appraisal information including appraiser details,
+                RBI compliance images, jewellery items, and purity test results.
+              </p>
+              <div className="flex flex-col gap-3">
+                <div className="flex gap-3">
+                  <Button onClick={() => setShowQrCode(false)} variant="outline" className="flex-1 border-2 border-blue-200 text-blue-700 hover:bg-blue-50 font-semibold py-3 rounded-xl">
+                    Close
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      const link = document.createElement('a');
+                      link.href = qrCodeUrl;
+                      link.download = 'appraisal-qr-code.png';
+                      link.click();
+                      showToast('QR Code image downloaded!', 'success');
+                    }}
+                    className="flex-1 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 font-semibold py-3 rounded-xl shadow-lg flex items-center justify-center gap-2"
+                  >
+                    <Download className="w-4 h-4" />
+                    PNG
+                  </Button>
+                </div>
+                <Button
+                  onClick={downloadQRCodeAsPDF}
+                  className="w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 font-semibold py-3 rounded-xl shadow-lg flex items-center justify-center gap-2"
+                >
+                  <FileDown className="w-5 h-5" />
+                  Download as PDF
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* QR Scanner Modal */}
+        {showQrScanner && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="bg-white/95 backdrop-blur-sm rounded-2xl p-8 max-w-2xl w-full shadow-2xl border border-blue-200">
+              <h3 className="text-2xl font-bold mb-6 text-blue-900 text-center tracking-wide flex items-center justify-center gap-3">
+                <ScanLine className="w-8 h-8 text-blue-600 animate-pulse" />
+                Scan QR Code
+              </h3>
+
+              <div className="relative mb-6">
+                <video
+                  ref={qrScannerVideoRef}
+                  className="w-full rounded-xl shadow-lg"
+                  playsInline
+                />
+                <canvas ref={qrScannerCanvasRef} className="hidden" />
+
+                {/* Scanner overlay */}
+                <div className="absolute inset-0 pointer-events-none">
+                  <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-64 h-64 border-4 border-blue-500 rounded-xl">
+                    <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-blue-600 rounded-tl-xl"></div>
+                    <div className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-blue-600 rounded-tr-xl"></div>
+                    <div className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-blue-600 rounded-bl-xl"></div>
+                    <div className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-blue-600 rounded-br-xl"></div>
+                  </div>
+                </div>
+              </div>
+
+              {scannedData && (
+                <div className="mb-6 p-4 bg-green-50 border-2 border-green-200 rounded-xl">
+                  <h4 className="font-bold text-green-900 mb-2">Scanned Data:</h4>
+                  <pre className="text-sm text-green-800 whitespace-pre-wrap">{JSON.stringify(scannedData, null, 2)}</pre>
+                </div>
+              )}
+
+              <div className="space-y-3">
+                <div className="text-center">
+                  <label className="cursor-pointer inline-block">
+                    <span className="px-6 py-3 bg-blue-100 text-blue-700 rounded-xl font-semibold hover:bg-blue-200 transition-colors inline-flex items-center gap-2">
+                      <QrCode className="w-5 h-5" />
+                      Upload QR Code Image
+                    </span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleQRFileUpload}
+                      className="hidden"
+                    />
+                  </label>
+                </div>
+
+                <Button
+                  onClick={stopQRScanner}
+                  variant="outline"
+                  className="w-full border-2 border-red-200 text-red-700 hover:bg-red-50 font-semibold py-3 rounded-xl"
+                >
+                  Close Scanner
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div className="bg-gradient-to-r from-blue-100 to-indigo-100 px-10 py-8 flex justify-between border-t border-blue-200/50">
+          <button
+            onClick={() => navigate('/rbi-compliance')}
+            className="px-8 py-4 bg-white/80 hover:bg-white text-blue-700 rounded-2xl font-bold transition-all duration-300 flex items-center gap-3 shadow-lg hover:shadow-xl border border-blue-200"
+          >
+            <ArrowLeft className="w-6 h-6" />
+            Back
+          </button>
+          <button
+            onClick={handleNext}
+            disabled={isLoading || !allItemsTested()}
+            className="px-8 py-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-2xl font-bold transition-all duration-300 shadow-xl hover:shadow-2xl flex items-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isLoading ? 'Saving...' : 'Next Step'}
+            <ArrowRight className="w-6 h-6" />
+          </button>
         </div>
       </div>
     </div>
