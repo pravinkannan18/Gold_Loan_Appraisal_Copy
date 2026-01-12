@@ -1,8 +1,8 @@
 import { useMemo, useState, useRef } from "react";
-import { useLocation,useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { HoverButton } from "@/components/ui/hover-button";
-import { LogOut, Camera, FileText, X, CheckCircle, User } from "lucide-react";
+import { LogOut, Camera, FileText, X, CheckCircle, User, Settings } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { AuroraLayout } from "@/components/layouts/AuroraLayout";
 import { DicedHeroSection } from "@/components/ui/diced-hero-section";
@@ -34,32 +34,32 @@ const Dashboard = () => {
     try {
       setCameraError(null);
       setIsCameraTesting(true);
-      
+
       // Check if camera is available
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
         throw new Error("Camera not supported on this browser/device");
       }
-      
+
       // Check for HTTPS (required for camera access)
       if (location.protocol !== 'https:' && location.hostname !== 'localhost') {
         throw new Error("Camera access requires HTTPS connection");
       }
-      
+
       // Request camera permission first
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ 
-          video: { width: 1280, height: 720 } 
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { width: 1280, height: 720 }
         });
-        
+
         // Test if camera is actually working
         const track = stream.getVideoTracks()[0];
         if (!track) {
           throw new Error("No camera device found");
         }
-        
+
         // Stop the test stream immediately
         stream.getTracks().forEach(track => track.stop());
-        
+
         setShowCameraTest(true);
         toast({
           title: "Camera Test Started",
@@ -67,7 +67,7 @@ const Dashboard = () => {
         });
       } catch (permissionError: any) {
         let errorMessage = "Camera permission denied";
-        
+
         if (permissionError.name === 'NotFoundError') {
           errorMessage = "No camera device found on this device";
         } else if (permissionError.name === 'NotAllowedError') {
@@ -77,7 +77,7 @@ const Dashboard = () => {
         } else if (permissionError.name === 'OverconstrainedError') {
           errorMessage = "Camera doesn't support the required resolution";
         }
-        
+
         throw new Error(errorMessage);
       }
     } catch (error: any) {
@@ -98,7 +98,7 @@ const Dashboard = () => {
       title: "Camera Test Successful",
       description: "Camera quality check completed successfully!",
     });
-    
+
     // Auto-close after 2 seconds
     setTimeout(() => {
       setShowCameraTest(false);
@@ -124,7 +124,7 @@ const Dashboard = () => {
     // Clear any existing appraiser data
     localStorage.removeItem("currentAppraiser");
     localStorage.removeItem("jewelleryItems");
-    
+
     // Start facial recognition workflow
     setShowFacialRecognition(true);
   };
@@ -176,12 +176,16 @@ const Dashboard = () => {
 
   return (
     <AuroraLayout>
-  <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(59,130,246,0.12),_transparent_45%),_radial-gradient(circle_at_bottom,_rgba(14,165,233,0.18),_transparent_55%)]">
+      <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(59,130,246,0.12),_transparent_45%),_radial-gradient(circle_at_bottom,_rgba(14,165,233,0.18),_transparent_55%)]">
         {/* Header */}
         <header className="border-b border-neutral-200/50 dark:border-neutral-700/50 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-xl shadow-sm">
           <div className="max-w-7xl mx-auto px-6 py-2.5 flex items-center justify-end">
             <div className="flex items-center gap-3">
               <span className="text-xs text-neutral-600 dark:text-neutral-400">{userName}</span>
+              <Button variant="ghost" size="sm" onClick={() => navigate('/camera-settings')} className="h-8 text-xs">
+                <Settings className="mr-1.5 h-3.5 w-3.5" />
+                Settings
+              </Button>
               <Button variant="ghost" size="sm" onClick={handleSignOut} className="h-8 text-xs">
                 <LogOut className="mr-1.5 h-3.5 w-3.5" />
                 Sign Out
@@ -250,7 +254,7 @@ const Dashboard = () => {
                 fontFamily: "'Playfair Display', 'Cinzel', serif",
                 fontStyle: "italic"
               }}
-              subMainTextStyle={{ 
+              subMainTextStyle={{
                 color: "var(--diced-hero-section-sub-text)",
                 fontSize: "1.25rem",
                 fontFamily: "Playfair Display, serif",
@@ -268,10 +272,10 @@ const Dashboard = () => {
               fontFamily="inherit"
             />
           </div>
-          
+
           {/* Quick Action Buttons Row is now integrated into hero via extraActions */}
 
-          
+
         </main>
       </div>
 
@@ -284,7 +288,7 @@ const Dashboard = () => {
               Camera Quality Check
             </DialogTitle>
           </DialogHeader>
-          
+
           <div className="space-y-4">
             {cameraError ? (
               <div className="text-center p-8">
@@ -318,7 +322,7 @@ const Dashboard = () => {
                     Please allow camera access and capture a test photo to verify camera functionality.
                   </p>
                 </div>
-                
+
                 <div className="border-2 border-dashed border-gray-300 rounded-lg p-4">
                   <LiveCamera
                     ref={cameraRef}
@@ -327,12 +331,12 @@ const Dashboard = () => {
                     onClose={handleCloseCameraTest}
                   />
                 </div>
-                
+
                 <div className="flex justify-between gap-3">
                   <Button onClick={handleCloseCameraTest} variant="outline">
                     Cancel Test
                   </Button>
-                  <Button 
+                  <Button
                     onClick={() => cameraRef.current?.capturePhoto()}
                     className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700"
                   >
@@ -355,7 +359,7 @@ const Dashboard = () => {
               Appraiser Identification
             </DialogTitle>
           </DialogHeader>
-          
+
           <FacialRecognition
             onAppraiserIdentified={handleAppraiserIdentified}
             onNewAppraiserRequired={handleNewAppraiserRequired}

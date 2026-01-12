@@ -4,7 +4,7 @@ import { ArrowLeft, ArrowRight, Check, Gem, QrCode, Play, Square, AlertCircle, S
 import { StepIndicator } from '../components/journey/StepIndicator';
 import { showToast } from '../lib/utils';
 import { Button } from '../components/ui/button';
-import { CameraSelect } from '../components/ui/camera-select';
+import { PageCameraSelector } from '../components/ui/page-camera-selector';
 import { useCameraDetection } from '../hooks/useCameraDetection';
 import QRCode from 'qrcode';
 import jsPDF from 'jspdf';
@@ -102,27 +102,32 @@ export function PurityTesting() {
   // Use the camera detection hook for smart auto-detection
   const {
     cameras,
-    selectedFaceCam,
     permission,
     isLoading: cameraLoading,
     error: cameraError,
-    selectFaceCam,
-    resetToAutoSelection,
-    testCamera,
     enumerateDevices,
     requestPermission,
     stopAllStreams,
   } = useCameraDetection();
 
+  const [selectedCameraId, setSelectedCameraId] = useState<string>('');
+
+  // Helper to get label
+  const selectedCameraLabel = cameras.find(c => c.deviceId === selectedCameraId)?.label || 'Camera';
+
+
   // Camera selection UI state
-  const [showCameraSelection, setShowCameraSelection] = useState(!selectedFaceCam);
+  const [showCameraSelection, setShowCameraSelection] = useState(false);
 
   // Sync selection state with panel visibility
+  // Sync selection state with panel visibility
   useEffect(() => {
-    if (!selectedFaceCam) {
+    if (!selectedCameraId) {
       setShowCameraSelection(true);
+    } else {
+      setShowCameraSelection(false);
     }
-  }, [selectedFaceCam]);
+  }, [selectedCameraId]);
 
   // Auto-request camera permission on mount to get device labels
   useEffect(() => {
@@ -182,7 +187,7 @@ export function PurityTesting() {
 
   const startAnalysis = async () => {
     try {
-      if (!selectedFaceCam) {
+      if (!selectedCameraId) {
         showToast('Please select Analysis camera', 'error');
         return;
       }
@@ -194,7 +199,7 @@ export function PurityTesting() {
       }
 
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { deviceId: { exact: selectedFaceCam.deviceId }, width: 640, height: 480 }
+        video: { deviceId: { exact: selectedCameraId }, width: 640, height: 480 }
       });
       stream1Ref.current = stream;
       if (video1Ref.current) {
@@ -210,7 +215,7 @@ export function PurityTesting() {
         setTimeout(startAnalysisLoop, 100);
       }
 
-      showToast(`Analysis Started: ${selectedFaceCam.label}`, 'success');
+      showToast(`Analysis Started: ${selectedCameraLabel}`, 'success');
     } catch (error) {
       console.error('Error starting analysis:', error);
       showToast('Failed to start Analysis', 'error');
@@ -242,11 +247,11 @@ export function PurityTesting() {
   // Preview management for selected camera
   useEffect(() => {
     const startPreview1 = async () => {
-      if (selectedFaceCam && !isAnalysisActive) {
+      if (selectedCameraId && !isAnalysisActive) {
         try {
           if (previewStream1Ref.current) previewStream1Ref.current.getTracks().forEach(t => t.stop());
           const stream = await navigator.mediaDevices.getUserMedia({
-            video: { deviceId: { exact: selectedFaceCam.deviceId }, width: 640, height: 480 }
+            video: { deviceId: { exact: selectedCameraId }, width: 640, height: 480 }
           });
           previewStream1Ref.current = stream;
           if (video1Ref.current) {
@@ -265,7 +270,7 @@ export function PurityTesting() {
         previewStream1Ref.current = null;
       }
     };
-  }, [selectedFaceCam, isAnalysisActive]);
+  }, [selectedCameraId, isAnalysisActive]);
 
 
 
@@ -701,49 +706,12 @@ export function PurityTesting() {
             ) : (
               <div>
                 <div className="flex justify-center mb-6">
-                  {/* Face Camera Selection with Smart Detection */}
-                  <CameraSelect
+                  <PageCameraSelector
+                    context="purity-testing"
                     label="📹 Analysis Camera (Rubbing & Acid)"
-                    devices={cameras}
-                    selectedDevice={selectedFaceCam}
-                    onSelect={selectFaceCam}
-                    onTest={testCamera}
+                    onCameraSelected={(camera) => setSelectedCameraId(camera?.deviceId || '')}
+                    className="w-full max-w-md"
                   />
-                </div>
-
-                {/* Camera Info Display */}
-                <div className="p-4 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border-2 border-blue-200">
-                  <div className="flex items-center justify-between mb-3">
-                    <p className="text-sm text-blue-800 font-bold">
-                      📊 Available Cameras ({cameras.length}):
-                    </p>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                    {cameras.map((camera) => {
-                      const isSelected =
-                        camera.deviceId === selectedFaceCam?.deviceId;
-
-                      return (
-                        <div
-                          key={camera.deviceId}
-                          className={`text-xs p-3 rounded-lg border-2 transition-all ${isSelected
-                            ? 'bg-blue-100 text-blue-900 border-blue-400 font-semibold'
-                            : 'bg-white text-gray-700 border-gray-200'
-                            }`}
-                        >
-                          <div className="flex items-center gap-2 mb-1">
-                            {isSelected && <div className="w-2 h-2 bg-blue-600 rounded-full"></div>}
-                            <span className="font-mono font-bold">
-                              {camera.label || `Camera ${camera.index}`}
-                            </span>
-                          </div>
-                          <div className="text-xs opacity-75 font-mono">
-                            ID: {camera.deviceId ? camera.deviceId.substring(0, 20) + '...' : 'N/A'}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
                 </div>
 
                 {cameraError && (
@@ -784,10 +752,10 @@ export function PurityTesting() {
               <h3 className="text-2xl font-bold text-blue-900 mb-6 tracking-wide">Backend-Powered Purity Analysis</h3>
 
               <div className="flex flex-col items-center gap-3">
-                {selectedFaceCam && (
+                {selectedCameraId && (
                   <div className="text-sm text-blue-700 bg-blue-100 px-4 py-2 rounded-lg font-semibold flex items-center gap-2">
                     <div className={`${isAnalysisActive ? 'bg-green-600 animate-pulse' : 'bg-blue-600'} w-2 h-2 rounded-full`}></div>
-                    Using {selectedFaceCam.label}
+                    Using {selectedCameraLabel}
                   </div>
                 )}
                 <p className="text-sm text-blue-600 italic">Start analysis stream to detect Rubbing and Acid tests</p>
@@ -804,7 +772,7 @@ export function PurityTesting() {
                     <Button
                       onClick={toggleAnalysis}
                       size="default"
-                      disabled={!selectedFaceCam}
+                      disabled={!selectedCameraId}
                       className={isAnalysisActive
                         ? "bg-red-500 hover:bg-red-600 text-white px-6 py-2 h-auto"
                         : "bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2 h-auto"
@@ -835,14 +803,14 @@ export function PurityTesting() {
                     />
                   )}
 
-                  {!selectedFaceCam && (
+                  {!selectedCameraId && (
                     <div className="absolute inset-0 flex flex-col items-center justify-center text-blue-300 bg-slate-900/80">
                       <ScanLine className="w-16 h-16 mb-2 opacity-20" />
                       <p className="text-lg">Select Analysis Camera Above</p>
                     </div>
                   )}
 
-                  {!isAnalysisActive && selectedFaceCam && (
+                  {!isAnalysisActive && selectedCameraId && (
                     <div className="absolute inset-0 flex flex-col items-center justify-center text-blue-200 bg-slate-950/40 backdrop-blur-[2px]">
                       <p className="text-lg font-semibold bg-slate-900/80 px-6 py-3 rounded-full border border-blue-500/30 shadow-xl">Camera Idle - Ready to Analyze</p>
                     </div>

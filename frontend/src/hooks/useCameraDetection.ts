@@ -8,24 +8,27 @@ export interface CameraDevice {
   index?: number;
 }
 
-export interface CameraSelection {
-  faceCam: CameraDevice | null;
-  scanCam: CameraDevice | null;
-  allDevices: CameraDevice[];
-}
-
 export interface CameraPermissionState {
   status: 'prompt' | 'granted' | 'denied' | 'checking';
   error: string | null;
 }
 
+// Page contexts for camera selection
+export type CameraContext =
+  | 'appraiser-identification'
+  | 'customer-image-capture'
+  | 'purity-testing'
+  | 'rbi-compliance'
+  | 'general';
+
 const FACE_KEYWORDS = ['front', 'internal', 'integrated', 'face', 'built-in', 'webcam', 'ir camera'];
 const SCAN_KEYWORDS = ['usb', 'external', 'barcode', 'document', 'logitech', 'back', 'rear'];
 
+// LocalStorage key generator for page-specific cameras
+const getCameraStorageKey = (context: CameraContext) => `camera_${context}`;
+
 export const useCameraDetection = () => {
   const [cameras, setCameras] = useState<CameraDevice[]>([]);
-  const [selectedFaceCam, setSelectedFaceCam] = useState<CameraDevice | null>(null);
-  const [selectedScanCam, setSelectedScanCam] = useState<CameraDevice | null>(null);
   const [permission, setPermission] = useState<CameraPermissionState>({
     status: 'checking',
     error: null,
@@ -104,36 +107,6 @@ export const useCameraDetection = () => {
   }, []);
 
   /**
-   * Smart camera selection based on device labels
-   */
-  const smartSelectCameras = useCallback((devices: CameraDevice[]): CameraSelection => {
-    if (devices.length === 0) {
-      return { faceCam: null, scanCam: null, allDevices: [] };
-    }
-
-    // Find face camera (internal/built-in camera)
-    let faceCam = devices.find(device =>
-      device.label && FACE_KEYWORDS.some(keyword =>
-        device.label.toLowerCase().includes(keyword)
-      )
-    ) || devices[0]; // Fallback to first device
-
-    // Find scan camera (external/USB camera)
-    let scanCam = devices.find(device =>
-      device.label && SCAN_KEYWORDS.some(keyword =>
-        device.label.toLowerCase().includes(keyword)
-      )
-    );
-
-    // If no scan camera found, use second device or same as face cam
-    if (!scanCam) {
-      scanCam = devices.length > 1 ? devices[1] : devices[0];
-    }
-
-    return { faceCam, scanCam, allDevices: devices };
-  }, []);
-
-  /**
    * Enumerate all video input devices
    */
   const enumerateDevices = useCallback(async () => {
@@ -149,7 +122,7 @@ export const useCameraDetection = () => {
         const granted = await requestPermission();
         if (!granted) {
           setIsLoading(false);
-          return;
+          return [];
         }
       }
 
@@ -159,7 +132,7 @@ export const useCameraDetection = () => {
         .filter(device => device.kind === 'videoinput')
         .map((device, index) => ({
           deviceId: device.deviceId,
-          label: device.label,
+          label: device.label || `Camera ${index + 1}`,
           groupId: device.groupId,
           kind: 'videoinput' as const,
           index,
@@ -167,76 +140,105 @@ export const useCameraDetection = () => {
 
       setCameras(videoInputs);
 
-      // Check if we have stored preferences
-      const storedFaceCam = localStorage.getItem('selectedFaceCam');
-      const storedScanCam = localStorage.getItem('selectedScanCam');
-
-      let faceCam: CameraDevice | null = null;
-      let scanCam: CameraDevice | null = null;
-
-      // Try to restore from localStorage
-      if (storedFaceCam) {
-        faceCam = videoInputs.find(d => d.deviceId === storedFaceCam) || null;
-      }
-      if (storedScanCam) {
-        scanCam = videoInputs.find(d => d.deviceId === storedScanCam) || null;
-      }
-
-      // If no stored preferences or devices not found, don't auto-select
-      // (User must now select manually as per requirements)
-      if (!faceCam || !scanCam) {
-        console.log('📹 Manual selection required - no auto-selection applied');
-      }
-
-      setSelectedFaceCam(faceCam);
-      setSelectedScanCam(scanCam);
-
       console.log('📹 Detected cameras:', {
         total: videoInputs.length,
-        faceCam: faceCam?.label || 'None',
-        scanCam: scanCam?.label || 'None',
+        cameras: videoInputs.map(c => c.label),
       });
 
       setIsLoading(false);
+      return videoInputs;
     } catch (error: any) {
       console.error('Device enumeration failed:', error);
       setError('Failed to enumerate camera devices: ' + error.message);
       setIsLoading(false);
+      return [];
     }
-  }, [checkPermission, requestPermission, smartSelectCameras]);
+  }, [checkPermission, requestPermission]);
 
   /**
-   * Manually select a camera
+   * Get saved camera for specific page/context
    */
-  const selectFaceCam = useCallback((device: CameraDevice | null) => {
-    setSelectedFaceCam(device);
-    if (device) {
-      localStorage.setItem('selectedFaceCam', device.deviceId);
+  const getCameraForPage = useCallback((context: CameraContext): CameraDevice | null => {
+    const storageKey = getCameraStorageKey(context);
+    const savedDeviceId = localStorage.getItem(storageKey);
+
+    if (!savedDeviceId) {
+      return null;
+    }
+
+    // Note: cameras state might be empty on first render, so we might need to find it 
+    // after enumeration. For now, we try to find it in the current list.
+    // If cameras list is empty, this returns undefined/null, effectively waiting for enumeration.
+    const camera = cameras.find(c => c.deviceId === savedDeviceId);
+
+    if (camera) {
+      console.log(`📹 Auto-loaded ${context} camera:`, camera.label);
+      return camera;
+    } else if (cameras.length > 0) {
+      // Only warn if we have cameras but couldn't find the saved one
+      console.warn(`⚠️ Saved ${context} camera not found in current device list`);
+      // Optional: don't clear it immediately in case of temporary glitche, 
+      // but strictly speaking if it's not in enumerated list, it's gone.
+      return null;
+    }
+    return null;
+  }, [cameras]);
+
+  /**
+   * Save camera for specific page/context
+   */
+  const setCameraForPage = useCallback((context: CameraContext, camera: CameraDevice | null) => {
+    const storageKey = getCameraStorageKey(context);
+
+    if (camera) {
+      localStorage.setItem(storageKey, camera.deviceId);
+      console.log(`✅ Saved ${context} camera:`, camera.label);
     } else {
-      localStorage.removeItem('selectedFaceCam');
+      localStorage.removeItem(storageKey);
+      console.log(`🗑️ Cleared ${context} camera`);
     }
   }, []);
 
-  const selectScanCam = useCallback((device: CameraDevice | null) => {
-    setSelectedScanCam(device);
-    if (device) {
-      localStorage.setItem('selectedScanCam', device.deviceId);
-    } else {
-      localStorage.removeItem('selectedScanCam');
-    }
-  }, []);
+  /**
+   * Get all saved cameras (for dashboard overview)
+   */
+  const getAllSavedCameras = useCallback((): Record<CameraContext, CameraDevice | null> => {
+    const contexts: CameraContext[] = [
+      'appraiser-identification',
+      'customer-image-capture',
+      'purity-testing',
+      'rbi-compliance',
+      'general',
+    ];
+
+    const savedCameras: Record<string, CameraDevice | null> = {};
+
+    contexts.forEach(context => {
+      savedCameras[context] = getCameraForPage(context);
+    });
+
+    return savedCameras as Record<CameraContext, CameraDevice | null>;
+  }, [getCameraForPage]);
 
   /**
-   * Reset to smart auto-selection
+   * Clear all saved cameras
    */
-  const resetToAutoSelection = useCallback(() => {
-    localStorage.removeItem('selectedFaceCam');
-    localStorage.removeItem('selectedScanCam');
+  const clearAllCameras = useCallback(() => {
+    const contexts: CameraContext[] = [
+      'appraiser-identification',
+      'customer-image-capture',
+      'purity-testing',
+      'rbi-compliance',
+      'general',
+    ];
 
-    const smartSelection = smartSelectCameras(cameras);
-    setSelectedFaceCam(smartSelection.faceCam);
-    setSelectedScanCam(smartSelection.scanCam);
-  }, [cameras, smartSelectCameras]);
+    contexts.forEach(context => {
+      const storageKey = getCameraStorageKey(context);
+      localStorage.removeItem(storageKey);
+    });
+
+    console.log('🗑️ All camera settings cleared');
+  }, []);
 
   /**
    * Test camera by getting a stream
@@ -303,27 +305,22 @@ export const useCameraDetection = () => {
       tempStreamRef.current = null;
     }
 
-    // Note: We can't enumerate and stop all streams here because
-    // getUserMedia creates new streams. Instead, we just ensure
-    // our internal streams are stopped. The page should handle
-    // stopping any video element streams before calling this.
     console.log('✓ All internal streams stopped');
   }, []);
 
   return {
     // State
     cameras,
-    selectedFaceCam,
-    selectedScanCam,
     permission,
     isLoading,
     error,
 
     // Actions
     enumerateDevices,
-    selectFaceCam,
-    selectScanCam,
-    resetToAutoSelection,
+    getCameraForPage,
+    setCameraForPage,
+    getAllSavedCameras,
+    clearAllCameras,
     testCamera,
     requestPermission,
     stopAllStreams,

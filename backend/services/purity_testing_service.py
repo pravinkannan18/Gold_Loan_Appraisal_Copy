@@ -60,8 +60,12 @@ class PurityTestingService:
     MODEL_ACID_PATH = _ML_MODELS_DIR / "best_aci_liq.pt"
     
     CAM_INDEX = 0
-    CONF_THRESH = 0.5
-    IMGSZ = 320
+    CONF_THRESH = 0.35
+    IMGSZ = 224
+    
+    # Device configuration (auto-detect GPU/CPU)
+    # Set to 'cuda' to force GPU, 'cpu' to force CPU, or 'auto' for automatic
+    DEVICE_MODE = 'auto'  # Options: 'auto', 'cuda', 'cpu'
     
     # Colors
     STONE_BOX_COLOR = (0, 0, 255)
@@ -76,13 +80,18 @@ class PurityTestingService:
     def __init__(self, database=None):
         self.db = database
         self.available = YOLO_AVAILABLE
+        
+        # Device configuration (GPU/CPU)
+        self.device = self._detect_device()
+        print(f"🔧 Device configured: {self.device}")
 
         # Detection status
         self.detection_status = {
             "message": "Waiting to start...",
             "rubbing_detected": False,
             "acid_detected": False,
-            "current_task": "rubbing"
+            "current_task": "rubbing",
+            "device": str(self.device)
         }
         self.rubbing_confirmed = False
         self.acid_detected = False
@@ -108,28 +117,60 @@ class PurityTestingService:
         
         if YOLO_AVAILABLE:
             self._load_models()
+    
+    # ------------------------------------------------------------------ DEVICE DETECTION
+    def _detect_device(self):
+        """Auto-detect or configure device (GPU/CPU)"""
+        if self.DEVICE_MODE == 'cpu':
+            return 'cpu'
+        
+        if self.DEVICE_MODE == 'cuda':
+            if torch.cuda.is_available():
+                return 'cuda'
+            else:
+                print("⚠️ CUDA requested but not available. Falling back to CPU.")
+                return 'cpu'
+        
+        # Auto mode - use GPU if available
+        if torch.cuda.is_available():
+            device = 'cuda'
+            gpu_name = torch.cuda.get_device_name(0)
+            gpu_memory = torch.cuda.get_device_properties(0).total_memory / 1024**3
+            print(f"✓ GPU detected: {gpu_name} ({gpu_memory:.1f}GB)")
+            return device
+        else:
+            print("ℹ️ No GPU detected. Using CPU.")
+            return 'cpu'
 
     # ------------------------------------------------------------------ MODELS
     def _load_models(self):
-        """Load YOLO models"""
-        print("\n🔄 Loading YOLO models...")
+        """Load YOLO models and move to configured device"""
+        print(f"\n🔄 Loading YOLO models on device: {self.device.upper()}...")
+        
+        # Show GPU info if using CUDA
+        if self.device == 'cuda' and torch.cuda.is_available():
+            print(f"  GPU: {torch.cuda.get_device_name(0)}")
+            print(f"  VRAM: {torch.cuda.get_device_properties(0).total_memory / 1024**3:.1f}GB")
         
         try:
             if self.MODEL_GOLD_PATH.exists():
                 self.model_gold = YOLO(str(self.MODEL_GOLD_PATH))
-                print(f"  ✓ Gold model loaded: {self.MODEL_GOLD_PATH}")
+                self.model_gold.to(self.device)  # Move to GPU/CPU
+                print(f"  ✓ Gold model loaded on {self.device.upper()}: {self.MODEL_GOLD_PATH.name}")
             else:
                 print(f"  ⚠️ Gold model not found: {self.MODEL_GOLD_PATH}")
 
             if self.MODEL_STONE_PATH.exists():
                 self.model_stone = YOLO(str(self.MODEL_STONE_PATH))
-                print(f"  ✓ Stone model loaded: {self.MODEL_STONE_PATH}")
+                self.model_stone.to(self.device)  # Move to GPU/CPU
+                print(f"  ✓ Stone model loaded on {self.device.upper()}: {self.MODEL_STONE_PATH.name}")
             else:
                 print(f"  ⚠️ Stone model not found: {self.MODEL_STONE_PATH}")
                 
             if self.MODEL_ACID_PATH.exists():
                 self.model_acid = YOLO(str(self.MODEL_ACID_PATH))
-                print(f"  ✓ Acid model loaded: {self.MODEL_ACID_PATH}")
+                self.model_acid.to(self.device)  # Move to GPU/CPU
+                print(f"  ✓ Acid model loaded on {self.device.upper()}: {self.MODEL_ACID_PATH.name}")
             else:
                 print(f"  ⚠️ Acid model not found: {self.MODEL_ACID_PATH}")
                 

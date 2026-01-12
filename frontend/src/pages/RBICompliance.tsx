@@ -1,9 +1,9 @@
-import {useMemo, useState, useRef, useEffect,useCallback } from 'react';
-import { useLocation,useNavigate } from 'react-router-dom';
-import { Camera, ArrowLeft, ArrowRight, Shield, CheckCircle, Sparkles, FileImage, Settings, Zap,MapPin, Globe, AlertCircle, Loader2 } from 'lucide-react';
+import { useMemo, useState, useRef, useEffect, useCallback } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { Camera, ArrowLeft, ArrowRight, Shield, CheckCircle, Sparkles, FileImage, Settings, Zap, MapPin, Globe, AlertCircle, Loader2 } from 'lucide-react';
 import { StepIndicator } from '../components/journey/StepIndicator';
 import { LiveCamera, LiveCameraHandle } from '../components/journey/LiveCamera';
-import { CameraSelector } from '../components/CameraSelector';
+import { PageCameraSelector } from '../components/ui/page-camera-selector';
 import { showToast } from '../lib/utils';
 
 interface JewelleryItemCapture {
@@ -73,17 +73,17 @@ export function RBICompliance() {
     // Check if appraiser data exists
     const appraiserData = localStorage.getItem('currentAppraiser');
     const frontImage = localStorage.getItem('customerFrontImage');
-    
+
     console.log('RBICompliance - checking prerequisites');
     console.log('Appraiser data:', appraiserData ? 'exists' : 'missing');
     console.log('Front image:', frontImage ? 'exists' : 'missing');
-    
+
     if (!appraiserData) {
       showToast('Please complete appraiser details first', 'error');
       navigate('/appraiser-details');
       return;
     }
-    
+
     if (!frontImage) {
       showToast('Please complete customer image capture first', 'error');
       navigate('/customer-image');
@@ -91,42 +91,42 @@ export function RBICompliance() {
     }
     fetchGPS();
     // ADD THIS BLOCK - Logs all cameras in console
-  const logAvailableCameras = async () => {
-    try {
-      // First, request permission (required to get real labels)
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-      stream.getTracks().forEach(track => track.stop()); // Stop immediately
+    const logAvailableCameras = async () => {
+      try {
+        // First, request permission (required to get real labels)
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        stream.getTracks().forEach(track => track.stop()); // Stop immediately
 
-      // Now enumerate devices
-      const devices = await navigator.mediaDevices.enumerateDevices();
-      const videoInputs = devices.filter(device => device.kind === 'videoinput');
+        // Now enumerate devices
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const videoInputs = devices.filter(device => device.kind === 'videoinput');
 
-      console.log('CAMERAS DETECTED:', videoInputs.length);
-      console.log('Available Cameras:');
+        console.log('CAMERAS DETECTED:', videoInputs.length);
+        console.log('Available Cameras:');
 
-      videoInputs.forEach((device, index) => {
-        console.log(`  [${index + 1}] ${device.label || 'Unknown Camera'}`, {
-          deviceId: device.deviceId,
-          label: device.label,
-          groupId: device.groupId
+        videoInputs.forEach((device, index) => {
+          console.log(`  [${index + 1}] ${device.label || 'Unknown Camera'}`, {
+            deviceId: device.deviceId,
+            label: device.label,
+            groupId: device.groupId
+          });
         });
-      });
 
-      if (videoInputs.length === 0) {
-        console.warn('No cameras found! Check connection or permissions.');
-      } else if (videoInputs.length === 1) {
-        console.log('Only 1 camera detected (probably built-in)');
-      } else {
-        console.log(`${videoInputs.length} cameras detected - you can switch!`);
+        if (videoInputs.length === 0) {
+          console.warn('No cameras found! Check connection or permissions.');
+        } else if (videoInputs.length === 1) {
+          console.log('Only 1 camera detected (probably built-in)');
+        } else {
+          console.log(`${videoInputs.length} cameras detected - you can switch!`);
+        }
+
+      } catch (err) {
+        console.error('Failed to access cameras:', err);
+        console.warn('Camera access denied or not available');
       }
+    };
 
-    } catch (err) {
-      console.error('Failed to access cameras:', err);
-      console.warn('Camera access denied or not available');
-    }
-  };
-
-  logAvailableCameras();
+    logAvailableCameras();
   }, [navigate, fetchGPS]);
 
   const handleConfirmItems = () => {
@@ -166,7 +166,7 @@ export function RBICompliance() {
     // Find the next uncaptured item
     const nextItem = Array.from({ length: totalItems }, (_, i) => i + 1)
       .find(num => !getItemImage(num));
-    
+
     if (nextItem) {
       setCurrentCapturingItem(nextItem);
       setCaptureMode('individual');
@@ -207,11 +207,11 @@ export function RBICompliance() {
   // Determine if user can proceed - either complete overall OR complete individual
   const canProceed = () => {
     if (totalItems === 0) return false;
-    
+
     const hasCompleteOverall = overallImages.length > 0;
     const hasCompleteIndividual = capturedItems.length === totalItems;
     const hasPartialIndividual = capturedItems.length > 0 && capturedItems.length < totalItems;
-    
+
     // Can proceed if:
     // 1. Has overall images (any amount), OR
     // 2. Has completed ALL individual items
@@ -227,11 +227,11 @@ export function RBICompliance() {
         title: 'Please enter the number of jewellery first'
       };
     }
-    
+
     const hasOverall = overallImages.length > 0;
     const hasPartialIndividual = capturedItems.length > 0 && capturedItems.length < totalItems;
     const hasCompleteIndividual = capturedItems.length === totalItems;
-    
+
     if (hasOverall) {
       return {
         disabled: false,
@@ -239,7 +239,7 @@ export function RBICompliance() {
         title: 'Proceed to next step (using overall images)'
       };
     }
-    
+
     if (hasCompleteIndividual) {
       return {
         disabled: false,
@@ -247,7 +247,7 @@ export function RBICompliance() {
         title: 'Proceed to next step (all individual items captured)'
       };
     }
-    
+
     if (hasPartialIndividual) {
       return {
         disabled: true,
@@ -255,7 +255,7 @@ export function RBICompliance() {
         title: `Complete all individual items or capture overall images (${capturedItems.length}/${totalItems} items captured)`
       };
     }
-    
+
     return {
       disabled: true,
       text: 'Next Step',
@@ -294,7 +294,7 @@ export function RBICompliance() {
         }
       }
       showToast(
-        `Individual capture incomplete. Please capture all items or use overall images. Missing: Item ${missingItems.join(', Item ')}`, 
+        `Individual capture incomplete. Please capture all items or use overall images. Missing: Item ${missingItems.join(', Item ')}`,
         'error'
       );
       return;
@@ -305,7 +305,7 @@ export function RBICompliance() {
     // 2. Has completed ALL individual items (capturedItems.length === totalItems)
     const hasCompleteOverall = overallImages.length > 0;
     const hasCompleteIndividual = capturedItems.length === totalItems;
-    
+
     if (!hasCompleteOverall && !hasCompleteIndividual) {
       showToast('Please complete either overall images or capture all individual item images', 'error');
       return;
@@ -324,9 +324,9 @@ export function RBICompliance() {
 
       // Store jewellery items in localStorage
       console.log('Step 1: Creating jewellery items data...');
-      
+
       let jewelleryItemsData;
-      
+
       if (capturedItems.length === totalItems) {
         // Use individual item images
         jewelleryItemsData = capturedItems.map((item) => ({
@@ -360,7 +360,7 @@ export function RBICompliance() {
       console.log('Step 2: Storing jewellery items in localStorage...');
       localStorage.setItem('jewelleryItems', JSON.stringify(jewelleryItemsData));
       console.log('✓ Jewellery items stored:', jewelleryItemsData);
-      
+
       // Store RBI compliance data
       console.log('Step 3: Creating RBI compliance data...');
       const rbiComplianceData = {
@@ -371,7 +371,7 @@ export function RBICompliance() {
         timestamp: new Date().toISOString(),
       };
       console.log('RBI compliance data created');
-      
+
       console.log('Step 4: Storing RBI compliance in localStorage...');
       localStorage.setItem('rbiCompliance', JSON.stringify(rbiComplianceData));
       console.log('✓ RBI compliance stored');
@@ -387,7 +387,7 @@ export function RBICompliance() {
       console.log('Verification - RBI in storage:', storedRBI ? 'YES' : 'NO');
 
       showToast('RBI compliance data saved!', 'success');
-      
+
       console.log('=== NAVIGATING TO PURITY TESTING ===');
       navigate('/purity-testing');
     } catch (error: any) {
@@ -415,24 +415,24 @@ export function RBICompliance() {
       <div className="absolute inset-0 bg-gradient-to-br from-blue-50 via-indigo-50/50 to-violet-50/30 dark:from-slate-950 dark:via-blue-950/50 dark:to-violet-950/30" />
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_40%,_rgba(59,130,246,0.1),_transparent_50%),_radial-gradient(circle_at_70%_70%,_rgba(99,102,241,0.08),_transparent_50%),_radial-gradient(circle_at_50%_10%,_rgba(139,92,246,0.06),_transparent_40%)] animate-pulse" style={{ animationDuration: '8s' }} />
       <div className="absolute inset-0 backdrop-blur-3xl bg-white/40 dark:bg-slate-900/40" />
-      
+
       {/* Premium Floating Orbs */}
       <div className="absolute top-20 left-10 w-72 h-72 bg-blue-400/20 dark:bg-blue-500/10 rounded-full blur-3xl animate-pulse" style={{ animationDuration: '6s' }} />
       <div className="absolute bottom-20 right-10 w-96 h-96 bg-indigo-400/20 dark:bg-indigo-500/10 rounded-full blur-3xl animate-pulse" style={{ animationDuration: '8s', animationDelay: '2s' }} />
-      
+
       <div className="relative z-10">
         <StepIndicator currentStep={3} />
 
         {/* Full Width Premium Layout */}
         <div className="min-h-[calc(100vh-120px)]">
           <div className="h-full bg-gradient-to-br from-white/95 via-white/90 to-blue-50/80 backdrop-blur-2xl dark:from-slate-900/95 dark:via-slate-900/90 dark:to-blue-950/80">
-            
+
             {/* Premium Header with Gradient Overlay - Full Width */}
             <div className="relative overflow-hidden bg-gradient-to-br from-blue-600 via-indigo-600 to-violet-700 px-8 py-8">
               {/* Animated Background Pattern */}
               <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxwYXRoIGQ9Ik0zNiAxOGMzLjMxNCAwIDYgMi42ODYgNiA2cy0yLjY4NiA2LTYgNi02LTIuNjg2LTYtNiAyLjY4Ni02IDYtNnptMCAwYzMuMzE0IDAgNiAyLjY4NiA2IDZzLTIuNjg2IDYtNiA2LTYtMi42ODYtNi02IDIuNjg2LTYgNi02eiIgc3Ryb2tlPSJyZ2JhKDI1NSwyNTUsMjU1LDAuMSkiIHN0cm9rZS13aWR0aD0iMSIvPjwvZz48L3N2Zz4=')] opacity-20" />
               <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-white/10 to-transparent rounded-full blur-3xl" />
-              
+
               <div className="container mx-auto max-w-7xl">
                 <div className="relative flex flex-wrap items-center gap-4">
                   <div className="group/icon relative">
@@ -502,12 +502,12 @@ export function RBICompliance() {
                 {/* Overall Collection Card */}
                 <div className="group/card relative overflow-hidden rounded-2xl border-2 border-blue-200/60 bg-gradient-to-br from-white via-blue-50/50 to-indigo-50/40 p-6 shadow-lg dark:border-blue-800/40 dark:from-slate-900/80 dark:via-blue-950/50 dark:to-indigo-950/40">
                   <div className="absolute top-0 right-0 h-32 w-32 bg-gradient-to-br from-blue-400/10 to-transparent rounded-full blur-2xl" />
-                  
+
                   <div className="relative flex items-start gap-4">
                     <div className="flex-shrink-0 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 p-3 shadow-lg ring-4 ring-blue-500/20">
                       <FileImage className="h-8 w-8 text-white" />
                     </div>
-                    
+
                     <div className="flex-1 min-w-0">
                       <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-1">
                         Overall Collection
@@ -515,7 +515,7 @@ export function RBICompliance() {
                       <p className="text-sm text-slate-600 dark:text-slate-400 mb-3">
                         Capture all jewellery items in one shot
                       </p>
-                      
+
                       <div className="flex items-center gap-3">
                         <div className="inline-flex items-center gap-2 rounded-lg bg-blue-100 px-3 py-1.5 dark:bg-blue-900/40">
                           <div className="h-2 w-2 rounded-full bg-blue-600 animate-pulse" />
@@ -532,57 +532,50 @@ export function RBICompliance() {
                 </div>
 
                 {/* Individual Items Card */}
-                <div className={`group/card relative overflow-hidden rounded-2xl border-2 p-6 shadow-lg ${
-                  totalItems === 0
+                <div className={`group/card relative overflow-hidden rounded-2xl border-2 p-6 shadow-lg ${totalItems === 0
                     ? 'border-slate-200/60 bg-slate-50/50 opacity-60 dark:border-slate-800/40 dark:bg-slate-900/40'
                     : 'border-indigo-200/60 bg-gradient-to-br from-white via-indigo-50/50 to-violet-50/40 dark:border-indigo-800/40 dark:from-slate-900/80 dark:via-indigo-950/50 dark:to-violet-950/40'
-                }`}>
-                  <div className={`absolute top-0 right-0 h-32 w-32 rounded-full blur-2xl ${
-                    totalItems === 0
+                  }`}>
+                  <div className={`absolute top-0 right-0 h-32 w-32 rounded-full blur-2xl ${totalItems === 0
                       ? 'bg-slate-400/5'
                       : 'bg-gradient-to-br from-indigo-400/10 to-transparent'
-                  }`} />
-                  
+                    }`} />
+
                   <div className="relative flex items-start gap-4">
-                    <div className={`flex-shrink-0 rounded-xl p-3 shadow-lg ${
-                      totalItems === 0
+                    <div className={`flex-shrink-0 rounded-xl p-3 shadow-lg ${totalItems === 0
                         ? 'bg-slate-400 ring-4 ring-slate-400/20'
                         : 'bg-gradient-to-br from-indigo-500 to-violet-600 ring-4 ring-indigo-500/20'
-                    }`}>
+                      }`}>
                       <Camera className="h-8 w-8 text-white" />
                     </div>
-                    
+
                     <div className="flex-1 min-w-0">
-                      <h3 className={`text-lg font-bold mb-1 ${
-                        totalItems === 0
+                      <h3 className={`text-lg font-bold mb-1 ${totalItems === 0
                           ? 'text-slate-500 dark:text-slate-500'
                           : 'text-slate-900 dark:text-white'
-                      }`}>
+                        }`}>
                         Individual Items
                       </h3>
-                      <p className={`text-sm mb-3 ${
-                        totalItems === 0
+                      <p className={`text-sm mb-3 ${totalItems === 0
                           ? 'text-slate-400'
                           : 'text-slate-600 dark:text-slate-400'
-                      }`}>
+                        }`}>
                         {totalItems === 0 ? 'Set item count first' : 'Capture each item one by one'}
                       </p>
-                      
+
                       <div className="flex items-center gap-3">
-                        <div className={`inline-flex items-center gap-2 rounded-lg px-3 py-1.5 ${
-                          totalItems === 0
+                        <div className={`inline-flex items-center gap-2 rounded-lg px-3 py-1.5 ${totalItems === 0
                             ? 'bg-slate-100 dark:bg-slate-800'
                             : capturedItems.length === totalItems
                               ? 'bg-green-100 dark:bg-green-900/40'
                               : 'bg-indigo-100 dark:bg-indigo-900/40'
-                        }`}>
-                          <span className={`text-sm font-bold ${
-                            totalItems === 0
+                          }`}>
+                          <span className={`text-sm font-bold ${totalItems === 0
                               ? 'text-slate-500 dark:text-slate-500'
                               : capturedItems.length === totalItems
                                 ? 'text-green-700 dark:text-green-300'
                                 : 'text-indigo-700 dark:text-indigo-300'
-                          }`}>
+                            }`}>
                             {capturedItems.length} / {totalItems}
                           </span>
                         </div>
@@ -632,10 +625,10 @@ export function RBICompliance() {
                   {/* Camera Selection - only show when idle */}
                   {!captureMode && (
                     <div className="mb-6">
-                      <CameraSelector
-                        onCameraSelect={setSelectedCameraId}
-                        selectedDeviceId={selectedCameraId}
-                        autoDetect={true}
+                      <PageCameraSelector
+                        context="rbi-compliance"
+                        label="Select Camera"
+                        onCameraSelected={(camera) => setSelectedCameraId(camera?.deviceId || '')}
                       />
                     </div>
                   )}
@@ -922,7 +915,7 @@ export function RBICompliance() {
                     <ArrowLeft className="h-4 w-4 transition-transform group-hover/btn:-translate-x-1" />
                     Back to Previous
                   </button>
-                  
+
                   {/* GPS Info */}
                   <div className="flex-1 flex justify-center">
                     {gpsLoading ? (

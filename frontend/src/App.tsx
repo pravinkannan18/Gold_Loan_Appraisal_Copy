@@ -14,6 +14,7 @@ import { PurityTesting } from "./pages/PurityTesting";
 import { AppraisalSummary } from "./pages/AppraisalSummary";
 import Records from "./pages/Records";
 import CameraTest from "./pages/CameraTest";
+import CameraSettings from "./pages/CameraSettings";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -28,6 +29,7 @@ const App = () => (
           <Route path="/" element={<Index />} />
           {/* <Route path="/auth" element={<Auth />} /> */}
           <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/camera-settings" element={<CameraSettings />} />
           <Route path="/new-appraisal" element={<NewAppraisal />} />
           <Route path="/appraiser-details" element={<AppraiserDetails />} />
           <Route path="/customer-image" element={<CustomerImage />} />
