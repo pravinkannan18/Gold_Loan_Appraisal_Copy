@@ -1,9 +1,8 @@
 import { useMemo, useState, useRef, useEffect, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Camera, ArrowLeft, ArrowRight, Shield, CheckCircle, Sparkles, FileImage, Settings, Zap, MapPin, Globe, AlertCircle, Loader2 } from 'lucide-react';
+import { Camera, ArrowLeft, ArrowRight, Shield, CheckCircle, Sparkles, FileImage, Zap, MapPin, Globe, AlertCircle, Loader2 } from 'lucide-react';
 import { StepIndicator } from '../components/journey/StepIndicator';
 import { LiveCamera, LiveCameraHandle } from '../components/journey/LiveCamera';
-import { PageCameraSelector } from '../components/ui/page-camera-selector';
 import { showToast } from '../lib/utils';
 
 interface JewelleryItemCapture {
@@ -36,9 +35,16 @@ export function RBICompliance() {
   const [currentCapturingItem, setCurrentCapturingItem] = useState<number | null>(null);
   const [captureMode, setCaptureMode] = useState<'overall' | 'individual' | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [selectedCameraId, setSelectedCameraId] = useState<string>('');
   const stage = useMemo(() => new URLSearchParams(location.search).get("stage") || "customer", [location.search]);
   const currentStepKey = stageToStepKey[stage] || 1;
+  // Initialize selectedCameraId from localStorage saved setting
+  const [selectedCameraId, setSelectedCameraId] = useState<string>(() => {
+    const savedDeviceId = localStorage.getItem('camera_rbi-compliance');
+    if (savedDeviceId) {
+      console.log('📹 Loaded saved camera for rbi-compliance:', savedDeviceId);
+    }
+    return savedDeviceId || '';
+  });
 
   const [gpsData, setGpsData] = useState<{
     latitude: number;
@@ -90,43 +96,6 @@ export function RBICompliance() {
       return;
     }
     fetchGPS();
-    // ADD THIS BLOCK - Logs all cameras in console
-    const logAvailableCameras = async () => {
-      try {
-        // First, request permission (required to get real labels)
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-        stream.getTracks().forEach(track => track.stop()); // Stop immediately
-
-        // Now enumerate devices
-        const devices = await navigator.mediaDevices.enumerateDevices();
-        const videoInputs = devices.filter(device => device.kind === 'videoinput');
-
-        console.log('CAMERAS DETECTED:', videoInputs.length);
-        console.log('Available Cameras:');
-
-        videoInputs.forEach((device, index) => {
-          console.log(`  [${index + 1}] ${device.label || 'Unknown Camera'}`, {
-            deviceId: device.deviceId,
-            label: device.label,
-            groupId: device.groupId
-          });
-        });
-
-        if (videoInputs.length === 0) {
-          console.warn('No cameras found! Check connection or permissions.');
-        } else if (videoInputs.length === 1) {
-          console.log('Only 1 camera detected (probably built-in)');
-        } else {
-          console.log(`${videoInputs.length} cameras detected - you can switch!`);
-        }
-
-      } catch (err) {
-        console.error('Failed to access cameras:', err);
-        console.warn('Camera access denied or not available');
-      }
-    };
-
-    logAvailableCameras();
   }, [navigate, fetchGPS]);
 
   const handleConfirmItems = () => {
@@ -533,48 +502,48 @@ export function RBICompliance() {
 
                 {/* Individual Items Card */}
                 <div className={`group/card relative overflow-hidden rounded-2xl border-2 p-6 shadow-lg ${totalItems === 0
-                    ? 'border-slate-200/60 bg-slate-50/50 opacity-60 dark:border-slate-800/40 dark:bg-slate-900/40'
-                    : 'border-indigo-200/60 bg-gradient-to-br from-white via-indigo-50/50 to-violet-50/40 dark:border-indigo-800/40 dark:from-slate-900/80 dark:via-indigo-950/50 dark:to-violet-950/40'
+                  ? 'border-slate-200/60 bg-slate-50/50 opacity-60 dark:border-slate-800/40 dark:bg-slate-900/40'
+                  : 'border-indigo-200/60 bg-gradient-to-br from-white via-indigo-50/50 to-violet-50/40 dark:border-indigo-800/40 dark:from-slate-900/80 dark:via-indigo-950/50 dark:to-violet-950/40'
                   }`}>
                   <div className={`absolute top-0 right-0 h-32 w-32 rounded-full blur-2xl ${totalItems === 0
-                      ? 'bg-slate-400/5'
-                      : 'bg-gradient-to-br from-indigo-400/10 to-transparent'
+                    ? 'bg-slate-400/5'
+                    : 'bg-gradient-to-br from-indigo-400/10 to-transparent'
                     }`} />
 
                   <div className="relative flex items-start gap-4">
                     <div className={`flex-shrink-0 rounded-xl p-3 shadow-lg ${totalItems === 0
-                        ? 'bg-slate-400 ring-4 ring-slate-400/20'
-                        : 'bg-gradient-to-br from-indigo-500 to-violet-600 ring-4 ring-indigo-500/20'
+                      ? 'bg-slate-400 ring-4 ring-slate-400/20'
+                      : 'bg-gradient-to-br from-indigo-500 to-violet-600 ring-4 ring-indigo-500/20'
                       }`}>
                       <Camera className="h-8 w-8 text-white" />
                     </div>
 
                     <div className="flex-1 min-w-0">
                       <h3 className={`text-lg font-bold mb-1 ${totalItems === 0
-                          ? 'text-slate-500 dark:text-slate-500'
-                          : 'text-slate-900 dark:text-white'
+                        ? 'text-slate-500 dark:text-slate-500'
+                        : 'text-slate-900 dark:text-white'
                         }`}>
                         Individual Items
                       </h3>
                       <p className={`text-sm mb-3 ${totalItems === 0
-                          ? 'text-slate-400'
-                          : 'text-slate-600 dark:text-slate-400'
+                        ? 'text-slate-400'
+                        : 'text-slate-600 dark:text-slate-400'
                         }`}>
                         {totalItems === 0 ? 'Set item count first' : 'Capture each item one by one'}
                       </p>
 
                       <div className="flex items-center gap-3">
                         <div className={`inline-flex items-center gap-2 rounded-lg px-3 py-1.5 ${totalItems === 0
-                            ? 'bg-slate-100 dark:bg-slate-800'
-                            : capturedItems.length === totalItems
-                              ? 'bg-green-100 dark:bg-green-900/40'
-                              : 'bg-indigo-100 dark:bg-indigo-900/40'
+                          ? 'bg-slate-100 dark:bg-slate-800'
+                          : capturedItems.length === totalItems
+                            ? 'bg-green-100 dark:bg-green-900/40'
+                            : 'bg-indigo-100 dark:bg-indigo-900/40'
                           }`}>
                           <span className={`text-sm font-bold ${totalItems === 0
-                              ? 'text-slate-500 dark:text-slate-500'
-                              : capturedItems.length === totalItems
-                                ? 'text-green-700 dark:text-green-300'
-                                : 'text-indigo-700 dark:text-indigo-300'
+                            ? 'text-slate-500 dark:text-slate-500'
+                            : capturedItems.length === totalItems
+                              ? 'text-green-700 dark:text-green-300'
+                              : 'text-indigo-700 dark:text-indigo-300'
                             }`}>
                             {capturedItems.length} / {totalItems}
                           </span>
@@ -622,7 +591,7 @@ export function RBICompliance() {
                     </span>
                   </div>
 
-                  {/* Camera Selection - only show when idle */}
+                  {/* Camera Selection - REMOVED */}{/*
                   {!captureMode && (
                     <div className="mb-6">
                       <PageCameraSelector
@@ -632,6 +601,7 @@ export function RBICompliance() {
                       />
                     </div>
                   )}
+                  */}
 
                   {/* Live Camera Preview */}
                   <LiveCamera
@@ -640,26 +610,27 @@ export function RBICompliance() {
                     selectedDeviceId={selectedCameraId}
                     displayMode="inline"
                     className="mt-6"
+                    onReadyChange={(ready) => console.log('RBI Camera Ready:', ready)}
+                    onError={(msg) => showToast(msg, 'error')}
                   />
 
                   {/* Action Buttons */}
                   <div className="mt-6 space-y-3">
                     {/* Camera Control Buttons */}
                     <div className="flex flex-wrap items-center justify-center gap-3">
-                      {!captureMode ? (
-                        <>
-                          <button
-                            onClick={handleOpenOverallCamera}
-                            className="group/btn relative overflow-hidden rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-700 px-6 py-3 font-bold text-white shadow-xl shadow-blue-500/40 transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl hover:shadow-blue-500/60"
-                          >
-                            <div className="absolute inset-0 bg-gradient-to-r from-blue-700 via-indigo-700 to-violet-800 opacity-0 transition-opacity group-hover/btn:opacity-100" />
-                            <span className="relative flex items-center gap-2">
-                              <Camera className="h-5 w-5 transition-transform group-hover/btn:rotate-12" />
-                              Open Camera
-                            </span>
-                          </button>
-                        </>
-                      ) : (
+                      {!captureMode && (
+                        <button
+                          onClick={handleOpenOverallCamera}
+                          className="group/btn relative overflow-hidden rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-700 px-6 py-3 font-bold text-white shadow-xl shadow-blue-500/40 transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl hover:shadow-blue-500/60"
+                        >
+                          <div className="absolute inset-0 bg-gradient-to-r from-blue-700 via-indigo-700 to-violet-800 opacity-0 transition-opacity group-hover/btn:opacity-100" />
+                          <span className="relative flex items-center gap-2">
+                            <Camera className="h-5 w-5 transition-transform group-hover/btn:rotate-12" />
+                            Open Camera
+                          </span>
+                        </button>
+                      )}
+                      {captureMode && (
                         <button
                           onClick={() => {
                             cameraRef.current?.closeCamera();
@@ -975,7 +946,7 @@ export function RBICompliance() {
           </div>
         </div>
       </div>
-    </div>
+    </div >
   );
 }
 

@@ -3,8 +3,6 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { Camera, ArrowLeft, ArrowRight, UserCircle, Shield, Sparkles, Eye } from 'lucide-react';
 import { StepIndicator } from '../components/journey/StepIndicator';
 import { LiveCamera, LiveCameraHandle } from '../components/journey/LiveCamera';
-import { PageCameraSelector } from '../components/ui/page-camera-selector';
-// import { CameraSelector } from '../components/CameraSelector'; // Removed
 import { showToast } from '../lib/utils';
 
 const stageToStepKey: Record<string, number> = {
@@ -22,9 +20,16 @@ export function CustomerImage() {
   const [frontImage, setFrontImage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isCameraOpen, setIsCameraOpen] = useState(false);
-  const [selectedCameraId, setSelectedCameraId] = useState<string>('');
   const stage = useMemo(() => new URLSearchParams(location.search).get("stage") || "customer", [location.search]);
   const currentStepKey = stageToStepKey[stage] || 1;
+  // Initialize selectedCameraId from localStorage saved setting
+  const [selectedCameraId, setSelectedCameraId] = useState<string>(() => {
+    const savedDeviceId = localStorage.getItem('camera_customer-image-capture');
+    if (savedDeviceId) {
+      console.log('📹 Loaded saved camera for customer-image-capture:', savedDeviceId);
+    }
+    return savedDeviceId || '';
+  });
 
   useEffect(() => {
     const appraiser = localStorage.getItem('currentAppraiser');
@@ -285,7 +290,7 @@ export function CustomerImage() {
 
 
 
-                    {/* Camera Selection */}
+                    {/* Camera Selection - REMOVED */}{/*
                     {!isCameraOpen && (
                       <div className="mt-6">
                         <PageCameraSelector
@@ -295,6 +300,7 @@ export function CustomerImage() {
                         />
                       </div>
                     )}
+                    */}
 
                     <LiveCamera
                       ref={cameraRef}

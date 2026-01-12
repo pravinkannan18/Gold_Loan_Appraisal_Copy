@@ -1,285 +1,182 @@
 import { useState, useEffect } from 'react';
-import { Camera, RefreshCw, Check, AlertCircle } from 'lucide-react';
-import { Button } from './button';
-import { useCameraDetection, CameraContext, CameraDevice } from '@/hooks/useCameraDetection';
+import { Camera, Video, RefreshCw, ChevronDown, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { CameraContext, CameraDevice } from '@/hooks/useCameraDetection';
 
 interface PageCameraSelectorProps {
-    context: CameraContext;
-    label?: string;
-    onCameraSelected?: (camera: CameraDevice | null) => void;
-    className?: string;
-    compact?: boolean;
+  context: CameraContext;
+  label?: string;
+  onCameraSelected: (camera: CameraDevice | null) => void;
+  className?: string;
 }
 
 export function PageCameraSelector({
-    context,
-    label,
-    onCameraSelected,
-    className = '',
-    compact = false,
+  context,
+  label = 'Select Camera',
+  onCameraSelected,
+  className = ''
 }: PageCameraSelectorProps) {
-    const {
-        cameras,
-        isLoading,
-        error: cameraError,
-        permission,
-        enumerateDevices,
-        getCameraForPage,
-        setCameraForPage,
-        testCamera,
-    } = useCameraDetection();
+  const [cameras, setCameras] = useState<CameraDevice[]>([]);
+  const [selectedCamera, setSelectedCamera] = useState<CameraDevice | null>(null);
+  const [isDetecting, setIsDetecting] = useState(false);
+  const [hasPermission, setHasPermission] = useState(false);
 
-    const [selectedCamera, setSelectedCamera] = useState<CameraDevice | null>(null);
-    const [showDetection, setShowDetection] = useState(false);
-    const [isTesting, setIsTesting] = useState(false);
+  const detectCameras = async () => {
+    setIsDetecting(true);
+    try {
+      // Request camera permission first
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      stream.getTracks().forEach(track => track.stop());
+      setHasPermission(true);
 
-    // Auto-load saved camera on mount
-    useEffect(() => {
-        if (cameras.length > 0) {
-            const savedCamera = getCameraForPage(context);
-            if (savedCamera) {
-                setSelectedCamera(savedCamera);
-                onCameraSelected?.(savedCamera);
-            } else {
-                // Show detection panel if no camera saved
-                setShowDetection(true);
-            }
+      // Enumerate devices
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const videoDevices = devices.filter(device => device.kind === 'videoinput');
+
+      const cameraList: CameraDevice[] = videoDevices.map((device, index) => ({
+        deviceId: device.deviceId,
+        label: device.label || `Camera ${index + 1}`,
+        groupId: device.groupId,
+        kind: 'videoinput' as const,
+        index
+      }));
+
+      setCameras(cameraList);
+
+      // Load saved camera from localStorage
+      const savedDeviceId = localStorage.getItem(`camera_${context}`);
+      if (savedDeviceId) {
+        const savedCamera = cameraList.find(c => c.deviceId === savedDeviceId);
+        if (savedCamera) {
+          setSelectedCamera(savedCamera);
+          onCameraSelected(savedCamera);
         }
-    }, [cameras, context, getCameraForPage, onCameraSelected]);
+      } else if (cameraList.length > 0) {
+        // Auto-select first camera if none saved
+        setSelectedCamera(cameraList[0]);
+        onCameraSelected(cameraList[0]);
+      }
 
-    const handleCameraSelect = (deviceId: string) => {
-        const camera = cameras.find(c => c.deviceId === deviceId);
-        if (camera) {
-            setSelectedCamera(camera);
-            setCameraForPage(context, camera);
-            onCameraSelected?.(camera);
-            setShowDetection(false);
-        }
-    };
-
-    const handleDetectCameras = async () => {
-        await enumerateDevices();
-        setShowDetection(true);
-    };
-
-    const handleTestCamera = async () => {
-        if (!selectedCamera) return;
-
-        setIsTesting(true);
-        const result = await testCamera(selectedCamera.deviceId);
-        setIsTesting(false);
-
-        if (!result) {
-            alert('Camera test failed. The camera might be in use by another application.');
-        }
-    };
-
-    const handleClearCamera = () => {
-        setSelectedCamera(null);
-        setCameraForPage(context, null);
-        onCameraSelected?.(null);
-        setShowDetection(true);
-    };
-
-    // Compact mode - just show current selection and detection button
-    if (compact) {
-        return (
-            <div className={cn('inline-flex items-center gap-2', className)}>
-                {selectedCamera ? (
-                    <>
-                        <div className="flex items-center gap-2 px-3 py-1.5 bg-green-50 border border-green-200 rounded-lg">
-                            <Check className="w-4 h-4 text-green-600" />
-                            <span className="text-sm font-medium text-green-800">{selectedCamera.label}</span>
-                        </div>
-                        <Button
-                            onClick={() => setShowDetection(!showDetection)}
-                            variant="outline"
-                            size="sm"
-                        >
-                            <Camera className="w-4 h-4" />
-                        </Button>
-                    </>
-                ) : (
-                    <Button
-                        onClick={handleDetectCameras}
-                        variant="outline"
-                        size="sm"
-                        disabled={isLoading}
-                    >
-                        {isLoading ? (
-                            <>
-                                <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                                Detecting...
-                            </>
-                        ) : (
-                            <>
-                                <Camera className="w-4 h-4 mr-2" />
-                                Select Camera
-                            </>
-                        )}</Button>
-                )}
-
-                {/* Detection panel (shown when toggled) */}
-                {showDetection && (
-                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-                        <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4 shadow-2xl">
-                            <div className="flex items-center justify-between mb-4">
-                                <h3 className="text-lg font-bold text-gray-900">Select Camera</h3>
-                                <button
-                                    onClick={() => setShowDetection(false)}
-                                    className="text-gray-500 hover:text-gray-700"
-                                >
-                                    ✕
-                                </button>
-                            </div>
-
-                            {cameras.length === 0 ? (
-                                <div className="text-center py-6">
-                                    <AlertCircle className="w-12 h-12 text-orange-500 mx-auto mb-3" />
-                                    <p className="text-gray-700 mb-4">No cameras detected</p>
-                                    <Button onClick={enumerateDevices} disabled={isLoading}>
-                                        <RefreshCw className={cn('w-4 h-4 mr-2', isLoading && 'animate-spin')} />
-                                        Detect Cameras
-                                    </Button>
-                                </div>
-                            ) : (
-                                <div className="space-y-2">
-                                    {cameras.map(camera => (
-                                        <button
-                                            key={camera.deviceId}
-                                            onClick={() => handleCameraSelect(camera.deviceId)}
-                                            className={cn(
-                                                'w-full text-left px-4 py-3 rounded-lg border-2 transition-all',
-                                                selectedCamera?.deviceId === camera.deviceId
-                                                    ? 'border-blue-500 bg-blue-50'
-                                                    : 'border-gray-200 hover:border-gray-300 bg-white'
-                                            )}
-                                        >
-                                            <div className="flex items-center gap-2">
-                                                {selectedCamera?.deviceId === camera.deviceId && (
-                                                    <Check className="w-4 h-4 text-blue-600" />
-                                                )}
-                                                <span className="font-medium text-sm">{camera.label}</span>
-                                            </div>
-                                        </button>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                )}
-            </div>
-        );
+    } catch (error: any) {
+      console.error('Camera detection error:', error);
+      setHasPermission(false);
+      setCameras([]);
+    } finally {
+      setIsDetecting(false);
     }
+  };
 
-    // Full mode - complete camera selector
+  useEffect(() => {
+    detectCameras();
+  }, []);
+
+  const handleCameraChange = (deviceId: string) => {
+    const camera = cameras.find(c => c.deviceId === deviceId) || null;
+    setSelectedCamera(camera);
+    
+    // Save to localStorage
+    if (camera) {
+      localStorage.setItem(`camera_${context}`, camera.deviceId);
+    } else {
+      localStorage.removeItem(`camera_${context}`);
+    }
+    
+    onCameraSelected(camera);
+  };
+
+  if (!hasPermission && cameras.length === 0) {
     return (
-        <div className={cn('bg-white rounded-xl border-2 border-gray-200 p-4', className)}>
-            <div className="flex items-center justify-between mb-3">
-                <label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-                    <Camera className="w-4 h-4" />
-                    {label || 'Camera'}
-                </label>
-                <Button
-                    onClick={handleDetectCameras}
-                    variant="outline"
-                    size="sm"
-                    disabled={isLoading}
-                >
-                    {isLoading ? (
-                        <RefreshCw className="w-4 h-4 animate-spin" />
-                    ) : (
-                        <RefreshCw className="w-4 h-4" />
-                    )}
-                </Button>
-            </div>
-
-            {permission.status === 'denied' && (
-                <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg">
-                    <div className="flex items-start gap-2">
-                        <AlertCircle className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />
-                        <div className="text-sm text-red-700">
-                            {permission.error || 'Camera permission denied'}
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {cameraError && (
-                <div className="mb-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                    <p className="text-sm text-yellow-800">{cameraError}</p>
-                </div>
-            )}
-
-            {isLoading ? (
-                <div className="text-center py-6">
-                    <div className="animate-spin rounded-full h-8 w-8 border-4 border-blue-500 border-t-transparent mx-auto mb-2" />
-                    <p className="text-sm text-gray-600">Detecting cameras...</p>
-                </div>
-            ) : cameras.length === 0 ? (
-                <div className="text-center py-6 bg-gray-50 rounded-lg">
-                    <AlertCircle className="w-10 h-10 text-gray-400 mx-auto mb-2" />
-                    <p className="text-sm text-gray-600">No cameras detected</p>
-                    <p className="text-xs text-gray-500 mt-1">Click refresh to detect</p>
-                </div>
-            ) : (
-                <div>
-                    <select
-                        value={selectedCamera?.deviceId || ''}
-                        onChange={(e) => handleCameraSelect(e.target.value)}
-                        className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 text-sm"
-                    >
-                        <option value="">Select camera...</option>
-                        {cameras.map(camera => (
-                            <option key={camera.deviceId} value={camera.deviceId}>
-                                {camera.label}
-                            </option>
-                        ))}
-                    </select>
-
-                    {selectedCamera && (
-                        <div className="mt-3 space-y-2">
-                            <div className="flex items-center gap-2 text-xs bg-green-50 border border-green-200 rounded-lg px-3 py-2">
-                                <Check className="w-4 h-4 text-green-600 flex-shrink-0" />
-                                <span className="text-green-800 flex-1">
-                                    {selectedCamera.label}
-                                </span>
-                            </div>
-
-                            <div className="flex gap-2">
-                                <Button
-                                    onClick={handleTestCamera}
-                                    variant="outline"
-                                    size="sm"
-                                    disabled={isTesting}
-                                    className="flex-1"
-                                >
-                                    {isTesting ? (
-                                        <>
-                                            <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                                            Testing...
-                                        </>
-                                    ) : (
-                                        <>
-                                            <Camera className="w-4 h-4 mr-2" />
-                                            Test Camera
-                                        </>
-                                    )}
-                                </Button>
-                                <Button
-                                    onClick={handleClearCamera}
-                                    variant="outline"
-                                    size="sm"
-                                    className="text-red-600 hover:bg-red-50"
-                                >
-                                    Clear
-                                </Button>
-                            </div>
-                        </div>
-                    )}
-                </div>
-            )}
+      <div className={cn("rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800", className)}>
+        <div className="flex items-center gap-2 mb-3">
+          <Video className="h-4 w-4 text-gray-500" />
+          <label className="text-sm font-medium text-gray-900 dark:text-white">{label}</label>
         </div>
+        <button
+          onClick={detectCameras}
+          disabled={isDetecting}
+          className="w-full flex items-center justify-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        >
+          {isDetecting ? (
+            <>
+              <RefreshCw className="h-4 w-4 animate-spin" />
+              Detecting Cameras...
+            </>
+          ) : (
+            <>
+              <Camera className="h-4 w-4" />
+              Detect Cameras
+            </>
+          )}
+        </button>
+      </div>
     );
+  }
+
+  if (cameras.length === 0) {
+    return (
+      <div className={cn("rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-800 dark:bg-red-900/20", className)}>
+        <div className="flex items-center gap-2 mb-2">
+          <Camera className="h-4 w-4 text-red-600 dark:text-red-400" />
+          <label className="text-sm font-medium text-red-900 dark:text-red-100">No Cameras Detected</label>
+        </div>
+        <p className="text-xs text-red-700 dark:text-red-300 mb-3">
+          Please connect a camera and try again
+        </p>
+        <button
+          onClick={detectCameras}
+          disabled={isDetecting}
+          className="flex items-center gap-2 rounded-md bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50 transition-colors"
+        >
+          <RefreshCw className={cn("h-4 w-4", isDetecting && "animate-spin")} />
+          Retry
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className={cn("rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800 shadow-sm", className)}>
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex-1">
+          <div className="flex items-center gap-2 mb-2">
+            <Video className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+            <label htmlFor={`camera-select-${context}`} className="text-sm font-medium text-gray-900 dark:text-white">
+              {label}
+            </label>
+          </div>
+          
+          <div className="relative">
+            <select
+              id={`camera-select-${context}`}
+              value={selectedCamera?.deviceId || ''}
+              onChange={(e) => handleCameraChange(e.target.value)}
+              className="w-full appearance-none rounded-lg border border-gray-300 bg-white px-4 py-2.5 pr-10 text-sm text-gray-900 shadow-sm transition-colors hover:border-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:hover:border-gray-500 dark:focus:border-blue-400"
+            >
+              {cameras.map((camera) => (
+                <option key={camera.deviceId} value={camera.deviceId}>
+                  {camera.label}
+                </option>
+              ))}
+            </select>
+            <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500 dark:text-gray-400" />
+          </div>
+
+          {cameras.length > 1 && (
+            <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+              {cameras.length} cameras available
+            </p>
+          )}
+        </div>
+
+        <button
+          onClick={detectCameras}
+          disabled={isDetecting}
+          title="Refresh camera list"
+          className="flex h-9 w-9 items-center justify-center rounded-lg bg-gray-100 text-gray-700 transition-colors hover:bg-gray-200 disabled:opacity-50 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+        >
+          <RefreshCw className={cn("h-4 w-4", isDetecting && "animate-spin")} />
+        </button>
+      </div>
+    </div>
+  );
 }

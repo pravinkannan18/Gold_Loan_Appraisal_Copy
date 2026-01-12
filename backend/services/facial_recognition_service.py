@@ -186,10 +186,36 @@ class FacialRecognitionService:
             # Convert base64 image to cv2 format
             img = self.base64_to_cv2_image(image)
             if img is None:
-                raise Exception("Invalid image format")
+                return {
+                    "recognized": False,
+                    "message": "Invalid image format. Please capture a clear photo.",
+                    "error": "invalid_image"
+                }
             
             # Extract face embedding
-            face_data = self.extract_face_embedding(img)
+            try:
+                face_data = self.extract_face_embedding(img)
+            except Exception as face_error:
+                error_msg = str(face_error)
+                if "No face detected" in error_msg:
+                    return {
+                        "recognized": False,
+                        "message": "No face detected in image. Please position your face clearly in the camera and try again.",
+                        "error": "no_face_detected"
+                    }
+                elif "Multiple faces" in error_msg:
+                    return {
+                        "recognized": False,
+                        "message": "Multiple faces detected. Please ensure only one person is in the frame.",
+                        "error": "multiple_faces"
+                    }
+                else:
+                    return {
+                        "recognized": False,
+                        "message": f"Face detection failed: {error_msg}",
+                        "error": "face_detection_error"
+                    }
+            
             query_embedding = face_data["embedding"]
             
             # Get all registered appraisers with face encodings

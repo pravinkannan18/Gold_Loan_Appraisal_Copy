@@ -1,4 +1,4 @@
-import { useMemo,useState, useRef, useCallback } from "react";
+import { useMemo, useState, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -31,7 +31,14 @@ const FacialRecognition = ({ onAppraiserIdentified, onNewAppraiserRequired, onCa
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [analysisProgress, setAnalysisProgress] = useState(0);
   const [analysisMessage, setAnalysisMessage] = useState('');
-  const [selectedCameraId, setSelectedCameraId] = useState<string>('');
+  // Initialize selectedCameraId from localStorage saved setting
+  const [selectedCameraId, setSelectedCameraId] = useState<string>(() => {
+    const savedDeviceId = localStorage.getItem('camera_appraiser-identification');
+    if (savedDeviceId) {
+      console.log('📹 Loaded saved camera for appraiser-identification:', savedDeviceId);
+    }
+    return savedDeviceId || '';
+  });
   const cameraRef = useRef<LiveCameraRef>(null);
   const location = useLocation();
   const stage = useMemo(() => new URLSearchParams(location.search).get("stage") || "customer", [location.search]);
@@ -117,7 +124,20 @@ const FacialRecognition = ({ onAppraiserIdentified, onNewAppraiserRequired, onCa
       await new Promise(resolve => setTimeout(resolve, 500));
 
       if (!response.ok) {
-        throw new Error(data.message || 'Recognition failed');
+        throw new Error(data.detail || data.message || 'Recognition failed');
+      }
+
+      // Handle error responses that come with 200 status
+      if (data.error) {
+        console.warn('Face recognition issue:', data.error, data.message);
+        // Return null to trigger "new appraiser" flow, but with a specific message
+        if (data.error === 'no_face_detected') {
+          throw new Error(data.message || 'No face detected. Please position your face clearly in the camera.');
+        } else if (data.error === 'multiple_faces') {
+          throw new Error(data.message || 'Multiple faces detected. Please ensure only one person is in the frame.');
+        }
+        // For other errors like service_offline, treat as new appraiser
+        return null;
       }
 
       if (data.recognized && data.appraiser) {
@@ -173,13 +193,17 @@ const FacialRecognition = ({ onAppraiserIdentified, onNewAppraiserRequired, onCa
           description: "No match found in database. Please provide appraiser details.",
         });
       }
-    } catch (error) {
+    } catch (error: any) {
+      const errorMessage = error?.message || "Failed to analyze facial features. Please try again.";
       toast({
         title: "Analysis Failed",
-        description: "Failed to analyze facial features. Please try again.",
+        description: errorMessage,
         variant: "destructive",
       });
       setAnalysisMessage('');
+      // Reset to camera view so user can try again
+      setAnalysisResult(null);
+      setCapturedImage(null);
     } finally {
       setIsAnalyzing(false);
     }

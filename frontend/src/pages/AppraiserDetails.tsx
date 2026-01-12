@@ -3,9 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { Camera, ImageIcon, ArrowLeft, ArrowRight } from 'lucide-react';
 import { StepIndicator } from '../components/journey/StepIndicator';
 import { LiveCamera, LiveCameraHandle } from '../components/journey/LiveCamera';
-import { PageCameraSelector } from '../components/ui/page-camera-selector';
 import { apiService } from '../services/api';
 import { generateAppraiserId, showToast } from '../lib/utils';
+import { useCameraDetection } from '../hooks/useCameraDetection';
 
 export function AppraiserDetails() {
   const navigate = useNavigate();
@@ -17,6 +17,16 @@ export function AppraiserDetails() {
   const [isCameraReady, setIsCameraReady] = useState(false);
   const [cameraError, setCameraError] = useState('');
   const [selectedCameraId, setSelectedCameraId] = useState<string>('');
+
+  const { getCameraForPage } = useCameraDetection();
+
+  // Auto-load saved camera
+  useEffect(() => {
+    const savedCamera = getCameraForPage('appraiser-identification');
+    if (savedCamera) {
+      setSelectedCameraId(savedCamera.deviceId);
+    }
+  }, [getCameraForPage]);
 
   // Check for captured photo from facial recognition
   useEffect(() => {
@@ -380,16 +390,7 @@ export function AppraiserDetails() {
                       </span>
                     </div>
 
-                    {/* Camera Selection */}
-                    {!isCameraOpen && (
-                      <div className="mt-6">
-                        <PageCameraSelector
-                          context="appraiser-identification"
-                          label="Select Camera"
-                          onCameraSelected={(camera) => setSelectedCameraId(camera?.deviceId || '')}
-                        />
-                      </div>
-                    )}
+                    {/* Camera Selection - REMOVED */}
 
                     <LiveCamera
                       ref={cameraRef}
