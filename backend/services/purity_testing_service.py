@@ -36,9 +36,7 @@ torch.load = _patched_torch_load
 try:
     from ultralytics import YOLO
     YOLO_AVAILABLE = True
-    print("✓ YOLO libraries loaded successfully")
-except ImportError as e:
-    print(f"⚠️ YOLO libraries not available: {e}")
+except ImportError:
     YOLO_AVAILABLE = False
 
 
@@ -83,7 +81,6 @@ class PurityTestingService:
         
         # Device configuration (GPU/CPU)
         self.device = self._detect_device()
-        print(f"🔧 Device configured: {self.device}")
 
         # Detection status
         self.detection_status = {
@@ -128,60 +125,36 @@ class PurityTestingService:
             if torch.cuda.is_available():
                 return 'cuda'
             else:
-                print("⚠️ CUDA requested but not available. Falling back to CPU.")
                 return 'cpu'
         
         # Auto mode - use GPU if available
         if torch.cuda.is_available():
-            device = 'cuda'
-            gpu_name = torch.cuda.get_device_name(0)
-            gpu_memory = torch.cuda.get_device_properties(0).total_memory / 1024**3
-            print(f"✓ GPU detected: {gpu_name} ({gpu_memory:.1f}GB)")
-            return device
+            return 'cuda'
         else:
-            print("ℹ️ No GPU detected. Using CPU.")
             return 'cpu'
 
     # ------------------------------------------------------------------ MODELS
     def _load_models(self):
         """Load YOLO models and move to configured device"""
-        print(f"\n🔄 Loading YOLO models on device: {self.device.upper()}...")
-        
-        # Show GPU info if using CUDA
-        if self.device == 'cuda' and torch.cuda.is_available():
-            print(f"  GPU: {torch.cuda.get_device_name(0)}")
-            print(f"  VRAM: {torch.cuda.get_device_properties(0).total_memory / 1024**3:.1f}GB")
-        
         try:
             if self.MODEL_GOLD_PATH.exists():
                 self.model_gold = YOLO(str(self.MODEL_GOLD_PATH))
-                self.model_gold.to(self.device)  # Move to GPU/CPU
-                print(f"  ✓ Gold model loaded on {self.device.upper()}: {self.MODEL_GOLD_PATH.name}")
-            else:
-                print(f"  ⚠️ Gold model not found: {self.MODEL_GOLD_PATH}")
+                self.model_gold.to(self.device)
 
             if self.MODEL_STONE_PATH.exists():
                 self.model_stone = YOLO(str(self.MODEL_STONE_PATH))
-                self.model_stone.to(self.device)  # Move to GPU/CPU
-                print(f"  ✓ Stone model loaded on {self.device.upper()}: {self.MODEL_STONE_PATH.name}")
-            else:
-                print(f"  ⚠️ Stone model not found: {self.MODEL_STONE_PATH}")
+                self.model_stone.to(self.device)
                 
             if self.MODEL_ACID_PATH.exists():
                 self.model_acid = YOLO(str(self.MODEL_ACID_PATH))
-                self.model_acid.to(self.device)  # Move to GPU/CPU
-                print(f"  ✓ Acid model loaded on {self.device.upper()}: {self.MODEL_ACID_PATH.name}")
-            else:
-                print(f"  ⚠️ Acid model not found: {self.MODEL_ACID_PATH}")
+                self.model_acid.to(self.device)
                 
-        except Exception as e:
-            print(f"  ❌ Error loading models: {e}")
+        except Exception:
+            pass
 
         self.available = (self.model_gold is not None and 
                           self.model_stone is not None and 
                           self.model_acid is not None)
-                          
-        print(f"  Models available: {self.available}")
 
     # ------------------------------------------------------------------ REFLECTION LOGIC (Ported)
     def _process_rubbing_frame(self, frame):
@@ -329,14 +302,12 @@ class PurityTestingService:
                         if ret:
                             cam.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
                             cam.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-                            print(f"  ✓ Camera {index} opened ({backend_name})")
                             return cam
                         cam.release()
                 except Exception:
                     pass
                 time.sleep(0.5)
         
-        print(f"  ❌ Camera {index} failed")
         return None
 
     def _release_cameras(self):
@@ -350,8 +321,6 @@ class PurityTestingService:
     # ------------------------------------------------------------------ START/STOP
     def start(self, camera1_index: int = None, camera2_index: int = None):
         """Start purity testing with cameras"""
-        print("\n🚀 Starting Purity Testing Service...")
-
         if camera1_index is not None: self.camera1_index = camera1_index
         if camera2_index is not None: self.camera2_index = camera2_index
 
@@ -383,12 +352,10 @@ class PurityTestingService:
             "camera2_active": cam2_ok
         }
 
-        print("✓ Purity Testing Service STARTED")
         return self.detection_status
 
     def stop(self):
         """Stop purity testing"""
-        print("\n🛑 Stopping Purity Testing Service...")
         self.is_running = False
         self._release_cameras()
         self.detection_status["message"] = "Detection stopped."

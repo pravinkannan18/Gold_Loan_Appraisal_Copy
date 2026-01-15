@@ -1,7 +1,7 @@
 """
-AWS-Compatible Fast Purity Testing Service
+AWS-Compatible Fast Purity Testing Service - LOW LATENCY VERSION
 Camera runs on user's browser, YOLO runs on AWS GPU
-Uses WebSocket for bidirectional frame streaming
+Optimized for real-time streaming with binary WebSocket
 """
 
 import os
@@ -12,7 +12,8 @@ import numpy as np
 import base64
 import torch
 import asyncio
-from typing import Optional, Dict, List, Any
+import struct
+from typing import Optional, Dict, List, Any, Tuple
 from pathlib import Path
 from collections import deque
 import threading
@@ -34,7 +35,6 @@ torch.load = _patched_torch_load
 try:
     from ultralytics import YOLO
     YOLO_AVAILABLE = True
-    print("✓ YOLO libraries loaded (AWS Service)")
 except ImportError as e:
     print(f"⚠️ YOLO not available: {e}")
     YOLO_AVAILABLE = False
@@ -42,18 +42,14 @@ except ImportError as e:
 
 class AWSPurityService:
     """
-    AWS-Compatible Purity Testing Service.
+    AWS-Compatible Purity Testing Service - OPTIMIZED FOR LOW LATENCY
     
-    Key difference from FastPurityService:
-    - Camera runs on USER'S BROWSER (not backend)
-    - Backend receives frames via WebSocket
-    - YOLO inference runs on AWS GPU
-    - Annotated frames sent back to browser
-    
-    This works with:
-    - AWS EC2 (with GPU: g4dn, p3, etc.)
-    - AWS Lambda (CPU only, slower)
-    - Any cloud provider
+    Optimizations:
+    - Binary WebSocket (no base64 overhead)
+    - Reduced image size (320x240)
+    - Lower JPEG quality
+    - FP16 inference on GPU
+    - Streamlined processing pipeline
     """
 
     # Paths
@@ -64,9 +60,10 @@ class AWSPurityService:
     MODEL_STONE_PATH = _ML_MODELS_DIR / "best_top_stone.pt"
     MODEL_ACID_PATH = _ML_MODELS_DIR / "best_aci_liq.pt"
 
-    # Optimized settings
-    IMGSZ = 320
+    # LOW LATENCY settings
+    IMGSZ = 320     # Smaller for faster inference
     CONF_THRESH = 0.35
+    OUTPUT_QUALITY = 60  # Lower JPEG quality for faster transfer
 
     # Colors (BGR)
     STONE_COLOR = (0, 0, 255)
@@ -90,7 +87,7 @@ class AWSPurityService:
         self.model_stone = None
         self.model_acid = None
         
-        # State (per-session, should use session IDs for multi-user)
+        # Sessions
         self.sessions: Dict[str, Dict] = {}
         
         # Load models
@@ -102,14 +99,13 @@ class AWSPurityService:
         if torch.cuda.is_available():
             gpu_name = torch.cuda.get_device_name(0)
             gpu_mem = torch.cuda.get_device_properties(0).total_memory / 1024**3
-            print(f"✓ AWS GPU: {gpu_name} ({gpu_mem:.1f}GB) - Using FP16")
+        
             return 'cuda'
         print("ℹ️ Using CPU (no GPU available)")
         return 'cpu'
 
     def _load_models(self):
         """Load and optimize YOLO models"""
-        print(f"\n🔄 Loading YOLO models for AWS on {self.device.upper()}...")
         
         try:
             if self.MODEL_STONE_PATH.exists():
@@ -117,21 +113,21 @@ class AWSPurityService:
                 self.model_stone.to(self.device)
                 if self.use_half:
                     self.model_stone.model.half()
-                print(f"  ✓ Stone model loaded")
+            
 
             if self.MODEL_GOLD_PATH.exists():
                 self.model_gold = YOLO(str(self.MODEL_GOLD_PATH))
                 self.model_gold.to(self.device)
                 if self.use_half:
                     self.model_gold.model.half()
-                print(f"  ✓ Gold model loaded")
+              
 
             if self.MODEL_ACID_PATH.exists():
                 self.model_acid = YOLO(str(self.MODEL_ACID_PATH))
                 self.model_acid.to(self.device)
                 if self.use_half:
                     self.model_acid.model.half()
-                print(f"  ✓ Acid model loaded")
+               
 
             # Warmup
             self._warmup_models()
@@ -140,11 +136,10 @@ class AWSPurityService:
             print(f"  ❌ Model loading error: {e}")
 
         self.available = all([self.model_gold, self.model_stone, self.model_acid])
-        print(f"  Models ready: {self.available}")
+        
 
     def _warmup_models(self):
         """Warmup models"""
-        print("  🔥 Warming up models...")
         dummy = np.zeros((self.IMGSZ, self.IMGSZ, 3), dtype=np.uint8)
         try:
             if self.model_stone:
@@ -153,7 +148,7 @@ class AWSPurityService:
                 self.model_gold(dummy, imgsz=self.IMGSZ, verbose=False)
             if self.model_acid:
                 self.model_acid(dummy, imgsz=self.IMGSZ, verbose=False)
-            print("  ✓ Models warmed up")
+            
         except Exception as e:
             print(f"  ⚠️ Warmup error: {e}")
 
@@ -413,6 +408,73 @@ class AWSPurityService:
             return sign_changes >= self.MIN_FLUCTUATIONS
 
         return False
+
+    # ================================================================
+    # FAST BINARY PROCESSING (LOW LATENCY)
+    # ================================================================
+    
+    async def process_frame_binary(self, session_id: str, jpeg_bytes: bytes) -> Tuple[bytes, Dict]:
+        """
+        FAST: Process raw JPEG bytes (no base64 overhead).
+        
+        Args:
+            session_id: Unique session identifier
+            jpeg_bytes: Raw JPEG bytes from browser
+            
+        Returns:
+            Tuple of (annotated_jpeg_bytes, status_dict)
+        """
+        start_time = time.time()
+        
+        # Get or create session
+        if session_id not in self.sessions:
+            self.create_session(session_id)
+        session = self.sessions[session_id]
+        
+        try:
+            # Decode JPEG directly (no base64!)
+            nparr = np.frombuffer(jpeg_bytes, np.uint8)
+            frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+            
+            if frame is None:
+                return b'', {"error": "Failed to decode frame"}
+            
+            # Process through YOLO
+            annotated, status = self._process_frame(frame, session)
+            
+            # Calculate timing
+            process_time = (time.time() - start_time) * 1000
+            fps = 1000 / process_time if process_time > 0 else 0
+            
+            # Add FPS overlay (smaller font for speed)
+            cv2.putText(annotated, f"{fps:.0f}fps {process_time:.0f}ms", 
+                       (10, annotated.shape[0] - 10),
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 255, 0), 1)
+            
+            # Encode result with lower quality for speed
+            _, buffer = cv2.imencode('.jpg', annotated, 
+                [cv2.IMWRITE_JPEG_QUALITY, self.OUTPUT_QUALITY])
+            
+            status['fps'] = round(fps, 1)
+            status['process_ms'] = round(process_time, 1)
+            
+            return buffer.tobytes(), status
+            
+        except Exception as e:
+            print(f"Binary frame processing error: {e}")
+            return b'', {"error": str(e)}
+
+    def create_binary_response(self, jpeg_bytes: bytes, metadata: Dict) -> bytes:
+        """
+        Create binary response packet:
+        [4 bytes: metadata length][JSON metadata][JPEG bytes]
+        
+        This is much faster than base64 encoding!
+        """
+        import json
+        meta_json = json.dumps(metadata).encode('utf-8')
+        meta_len = struct.pack('>I', len(meta_json))  # 4 bytes, big-endian
+        return meta_len + meta_json + jpeg_bytes
 
     # ================================================================
     # PUBLIC API

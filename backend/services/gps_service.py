@@ -29,10 +29,6 @@ class GPSService:
         self.TIMEOUT = 5  # seconds to wait for GPS data
         self.GEOAPIFY_KEY = os.getenv("GEOAPIFY_API_KEY", "")
         self.available = True
-        
-        print(f"[GPS] Initialized")
-        print(f"[GPS] Port: {self.GPS_PORT}")
-        print(f"[GPS] Geoapify API Key: {'Set' if self.GEOAPIFY_KEY else 'Not Set'}")
 
     def _read_from_serial(self):
         """Read GPS coordinates from serial port"""
@@ -61,10 +57,10 @@ class GPSService:
                     
             ser.close()
             
-        except SerialException as e:
-            print(f"[GPS] Serial port error: {e}")
-        except Exception as e:
-            print(f"[GPS] Unexpected error: {e}")
+        except SerialException:
+            pass
+        except Exception:
+            pass
             
         return lat, lon
 

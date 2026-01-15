@@ -33,9 +33,7 @@ torch.load = _patched_torch_load
 try:
     from ultralytics import YOLO
     YOLO_AVAILABLE = True
-    print("✓ YOLO libraries loaded (Fast Service)")
-except ImportError as e:
-    print(f"⚠️ YOLO not available: {e}")
+except ImportError:
     YOLO_AVAILABLE = False
 
 
@@ -115,51 +113,40 @@ class FastPurityService:
     def _setup_device(self) -> str:
         """Setup optimal device (GPU with FP16 if available)"""
         if torch.cuda.is_available():
-            gpu_name = torch.cuda.get_device_name(0)
-            gpu_mem = torch.cuda.get_device_properties(0).total_memory / 1024**3
-            print(f"✓ GPU: {gpu_name} ({gpu_mem:.1f}GB) - Using FP16")
             return 'cuda'
-        print("ℹ️ Using CPU (GPU not available)")
         return 'cpu'
 
     def _load_models(self):
         """Load and optimize YOLO models"""
-        print(f"\n🔄 Loading optimized YOLO models on {self.device.upper()}...")
-        
         try:
             if self.MODEL_STONE_PATH.exists():
                 self.model_stone = YOLO(str(self.MODEL_STONE_PATH))
                 self.model_stone.to(self.device)
                 if self.use_half:
                     self.model_stone.model.half()
-                print(f"  ✓ Stone model loaded (FP16: {self.use_half})")
 
             if self.MODEL_GOLD_PATH.exists():
                 self.model_gold = YOLO(str(self.MODEL_GOLD_PATH))
                 self.model_gold.to(self.device)
                 if self.use_half:
                     self.model_gold.model.half()
-                print(f"  ✓ Gold model loaded (FP16: {self.use_half})")
 
             if self.MODEL_ACID_PATH.exists():
                 self.model_acid = YOLO(str(self.MODEL_ACID_PATH))
                 self.model_acid.to(self.device)
                 if self.use_half:
                     self.model_acid.model.half()
-                print(f"  ✓ Acid model loaded (FP16: {self.use_half})")
 
             # Warmup models with dummy inference
             self._warmup_models()
             
-        except Exception as e:
-            print(f"  ❌ Model loading error: {e}")
+        except Exception:
+            pass
 
         self.available = all([self.model_gold, self.model_stone, self.model_acid])
-        print(f"  Models ready: {self.available}")
 
     def _warmup_models(self):
         """Warmup models with dummy inference for faster first prediction"""
-        print("  🔥 Warming up models...")
         dummy = np.zeros((self.IMGSZ, self.IMGSZ, 3), dtype=np.uint8)
         
         try:
@@ -169,9 +156,8 @@ class FastPurityService:
                 self.model_gold(dummy, imgsz=self.IMGSZ, verbose=False)
             if self.model_acid:
                 self.model_acid(dummy, imgsz=self.IMGSZ, verbose=False)
-            print("  ✓ Models warmed up")
-        except Exception as e:
-            print(f"  ⚠️ Warmup error: {e}")
+        except Exception:
+            pass
 
     # ================================================================
     # CAMERA MANAGEMENT
@@ -197,11 +183,9 @@ class FastPurityService:
                     if ret:
                         self.camera = cam
                         self.camera_index = index
-                        print(f"✓ Camera {index} opened")
                         return True
                     cam.release()
             
-            print(f"❌ Failed to open camera {index}")
             return False
 
     def _close_camera(self):
@@ -452,8 +436,6 @@ class FastPurityService:
         """Start the fast purity testing service"""
         if self.is_running:
             return {"success": True, "message": "Already running"}
-
-        print(f"\n🚀 Starting Fast Purity Service (Camera {camera_index})...")
         
         if not self._open_camera(camera_index):
             return {"success": False, "error": "Failed to open camera"}
@@ -479,7 +461,6 @@ class FastPurityService:
         self.capture_thread.start()
         self.process_thread.start()
 
-        print("✓ Fast Purity Service started")
         return {
             "success": True,
             "message": "Service started",
@@ -490,7 +471,6 @@ class FastPurityService:
 
     def stop(self) -> Dict:
         """Stop the service"""
-        print("\n🛑 Stopping Fast Purity Service...")
         self.is_running = False
         
         # Wait for threads
@@ -500,7 +480,6 @@ class FastPurityService:
             self.process_thread.join(timeout=1.0)
         
         self._close_camera()
-        print("✓ Fast Purity Service stopped")
         
         return {"success": True, "message": "Service stopped"}
 

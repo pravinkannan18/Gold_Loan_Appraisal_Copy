@@ -18,8 +18,6 @@ class Database:
         host = os.getenv('DB_HOST', '').strip()
         database_url = os.getenv('DATABASE_URL', '').strip()
         
-        print(f"\n--- Database Initialization Debug ---")
-        
         if host:
             # Using individual parameters
             self.connection_string = None
@@ -33,28 +31,18 @@ class Database:
             # Add SSL requirement for Supabase
             if "supabase" in host.lower():
                 self.connection_params['sslmode'] = 'require'
-                
-            print(f"STATUS: Using individual parameters")
-            print(f"DEBUG: Host={self.connection_params['host']}, User={self.connection_params['user']}")
         elif database_url:
             # Falling back to connection string
             self.connection_string = database_url.replace('postgresql+psycopg2://', 'postgresql://')
             if "supabase" in self.connection_string.lower() and "sslmode" not in self.connection_string:
                 sep = "&" if "?" in self.connection_string else "?"
                 self.connection_string += f"{sep}sslmode=require"
-            
-            import re
-            masked = re.sub(r':([^@]+)@', ':****@', self.connection_string)
-            print(f"STATUS: Using DATABASE_URL connection string")
-            print(f"DEBUG: {masked}")
             self.connection_params = None
         else:
             # Default to local
-            print("STATUS: No environment variables found, using local default")
             self.connection_string = "postgresql://postgres:admin@localhost:5432/gold_loan_appraisal"
             self.connection_params = None
 
-        print(f"--------------------------------------\n")
         self.init_database()
     
     def _parse_database_url(self, url):
@@ -87,20 +75,8 @@ class Database:
             else:
                 raise ValueError("No connection parameters or string available")
         except psycopg2.OperationalError as e:
-            error_msg = str(e)
-            print(f"\n❌ Database Connection Error: {error_msg}")
-            
-            if "host name" in error_msg.lower() or "not known" in error_msg.lower():
-                print("\n💡 POSSIBLE SOLUTIONS:")
-                print("1. Your computer cannot find the Supabase server. Check your internet connection.")
-                print("2. Ensure your Supabase project is NOT PAUSED. Go to Supabase Dashboard and Resume if needed.")
-                print("3. Try using the 'Transaction Pooler' connection string from Supabase (port 6543) instead of direct connection.")
-                current_host = self.connection_params.get('host') if self.connection_params else "Supabase"
-                print(f"4. Double check your host: {current_host}")
-            
             raise e
         except Exception as e:
-            print(f"❌ Unexpected connection failed: {e}")
             raise e
     
     def init_database(self):
@@ -127,9 +103,8 @@ class Database:
                     ALTER TABLE appraisers 
                     ADD COLUMN IF NOT EXISTS face_encoding TEXT
                 ''')
-                print("Added face_encoding column to appraisers table")
-            except Exception as e:
-                print(f"Face encoding column already exists or error: {e}")
+            except Exception:
+                pass
             
             # Appraisals table
             cursor.execute('''
@@ -188,10 +163,8 @@ class Database:
             ''')
             
             conn.commit()
-            print("PostgreSQL database initialized successfully")
         except Exception as e:
             conn.rollback()
-            print(f"Error initializing database: {e}")
             raise
         finally:
             cursor.close()
@@ -203,8 +176,7 @@ class Database:
             conn = self.get_connection()
             conn.close()
             return True
-        except Exception as e:
-            print(f"Database connection error: {e}")
+        except Exception:
             return False
     
     # Appraiser operations

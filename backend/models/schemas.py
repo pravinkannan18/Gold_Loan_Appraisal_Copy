@@ -35,10 +35,8 @@ detection_status = {"message": "Waiting to start..."}
 detection_states = {}
 
 # ==================== Load YOLO Models ====================
-print("Loading YOLO models...")
 model_rub = YOLO("best (rub2)(2).pt")
 model_acid = YOLO("best (rub2)(1).pt")
-print("Models loaded successfully.")
 
 # ==================== Robust CSV Reader ====================
 def safe_read_csv(csv_path: str) -> pd.DataFrame:
@@ -51,12 +49,10 @@ def safe_read_csv(csv_path: str) -> pd.DataFrame:
     for enc in encodings:
         try:
             df = pd.read_csv(path, encoding=enc)
-            print(f"CSV '{csv_path}' loaded with encoding: {enc}")
             return df
         except UnicodeDecodeError:
             continue
-        except Exception as e:
-            print(f"Error with {enc}: {e}")
+        except Exception:
             continue
     raise UnicodeDecodeError(f"Failed to read {csv_path} with any encoding")
 
@@ -64,9 +60,7 @@ def safe_read_csv(csv_path: str) -> pd.DataFrame:
 try:
     RUBBING_TASKS = safe_read_csv("task_sequence.csv")
     ACID_TASKS = safe_read_csv("task_sequence_main.csv")
-    print("Both CSV files loaded successfully at startup.")
-except Exception as e:
-    print(f"CRITICAL: Failed to load CSV files: {e}")
+except Exception:
     RUBBING_TASKS = pd.DataFrame()
     ACID_TASKS = pd.DataFrame()
 
@@ -78,15 +72,12 @@ def init_camera(index):
             cam.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
             cam.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
             cam.set(cv2.CAP_PROP_FPS, 30)
-            print(f"Camera {index} initialized on attempt {attempt + 1}")
             return cam
         time.sleep(1)
         cam.release()
         cam = cv2.VideoCapture(index, cv2.CAP_DSHOW)
-    print(f"FAILED to open camera {index}")
     return None
 
-print("Initializing cameras...")
 camera1 = init_camera(0)
 camera2 = init_camera(1)
 

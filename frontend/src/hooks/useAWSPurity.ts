@@ -1,12 +1,19 @@
 /**
- * AWS Purity Testing Hook
+ * AWS Purity Testing Hook - OPTIMIZED FOR LOW LATENCY
  * Camera runs on browser, YOLO runs on AWS GPU
- * Uses WebSocket for bidirectional frame streaming
+ * Uses binary WebSocket + reduced resolution for speed
  */
 import { useState, useEffect, useRef, useCallback } from 'react';
 
 const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 const WS_URL = BASE_URL.replace('http', 'ws');
+
+// ============ LOW LATENCY SETTINGS ============
+const FRAME_WIDTH = 320;      // Reduced from 640 for faster transfer
+const FRAME_HEIGHT = 240;     // Reduced from 480
+const JPEG_QUALITY = 0.5;     // Lower quality = smaller size = faster
+const FRAME_INTERVAL_MS = 100; // 10 FPS (balance between speed and server load)
+// ==============================================
 
 export interface PurityStatus {
   task: 'rubbing' | 'acid' | 'done';
@@ -24,6 +31,7 @@ export interface AWSPurityState {
   fps: number;
   processMs: number;
   error: string | null;
+  latency: number;
 }
 
 export function useAWSPurity() {
@@ -32,6 +40,8 @@ export function useAWSPurity() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const frameIntervalRef = useRef<number | null>(null);
+  const pendingRef = useRef<boolean>(false);  // Track if waiting for response
+  const frameTimestampRef = useRef<number>(0);
   
   const [state, setState] = useState<AWSPurityState>({
     connected: false,
@@ -42,68 +52,94 @@ export function useAWSPurity() {
     fps: 0,
     processMs: 0,
     error: null,
+    latency: 0,
   });
 
-  // Generate session ID
-  const generateSessionId = () => {
-    return Math.random().toString(36).substring(2, 10);
-  };
+  const generateSessionId = () => Math.random().toString(36).substring(2, 10);
 
-  // Connect to WebSocket
+  // Connect with binary WebSocket for speed
   const connect = useCallback((sessionId?: string) => {
     const sid = sessionId || generateSessionId();
     setState(prev => ({ ...prev, sessionId: sid }));
     
-    console.log(`🔌 Connecting to AWS purity WebSocket (session: ${sid})...`);
-    const ws = new WebSocket(`${WS_URL}/api/purity/aws/stream/${sid}`);
+    // Use the new binary endpoint for LOW LATENCY
+    console.log(`🚀 Connecting to LOW LATENCY Binary WebSocket (session: ${sid})...`);
+    const ws = new WebSocket(`${WS_URL}/api/purity/aws/stream-binary/${sid}`);
+    ws.binaryType = 'arraybuffer';  // Enable binary mode
     
     ws.onopen = () => {
-      console.log('✅ AWS WebSocket connected');
+      console.log('✅ Binary WebSocket connected (LOW LATENCY MODE)');
       setState(prev => ({ ...prev, connected: true, error: null }));
     };
 
     ws.onmessage = (event) => {
+      pendingRef.current = false;  // Response received, can send next frame
+      const latency = Date.now() - frameTimestampRef.current;
+      
       try {
-        const data = JSON.parse(event.data);
-        
-        if (data.type === 'frame') {
-          setState(prev => ({
-            ...prev,
-            annotatedFrame: `data:image/jpeg;base64,${data.frame}`,
-            status: data.status,
-            fps: data.fps || 0,
-            processMs: data.process_ms || 0,
-          }));
-        } else if (data.type === 'error') {
-          console.error('AWS error:', data.message);
-          setState(prev => ({ ...prev, error: data.message }));
-        } else if (data.type === 'control') {
-          console.log('Control:', data.message);
+        // Handle binary response (JPEG + JSON metadata)
+        if (event.data instanceof ArrayBuffer) {
+          const bytes = new Uint8Array(event.data);
+          
+          // Protocol: First 4 bytes = JSON length (big-endian), then JSON, then JPEG
+          const jsonLen = new DataView(event.data).getUint32(0, false);  // big-endian
+          const jsonBytes = bytes.slice(4, 4 + jsonLen);
+          const jpegBytes = bytes.slice(4 + jsonLen);
+          
+          const meta = JSON.parse(new TextDecoder().decode(jsonBytes));
+          
+          // Create blob URL (faster than base64)
+          const blob = new Blob([jpegBytes], { type: 'image/jpeg' });
+          const imageUrl = URL.createObjectURL(blob);
+          
+          setState(prev => {
+            // Clean up old blob URL
+            if (prev.annotatedFrame?.startsWith('blob:')) {
+              URL.revokeObjectURL(prev.annotatedFrame);
+            }
+            return {
+              ...prev,
+              annotatedFrame: imageUrl,
+              status: meta.status,
+              fps: meta.fps || 0,
+              processMs: meta.process_ms || 0,
+              latency,
+            };
+          });
+        } else {
+          // JSON fallback for compatibility
+          const data = JSON.parse(event.data);
+          if (data.type === 'frame') {
+            setState(prev => ({
+              ...prev,
+              annotatedFrame: `data:image/jpeg;base64,${data.frame}`,
+              status: data.status,
+              fps: data.fps || 0,
+              processMs: data.process_ms || 0,
+              latency,
+            }));
+          } else if (data.type === 'error') {
+            setState(prev => ({ ...prev, error: data.message }));
+          }
         }
       } catch (e) {
-        console.error('WebSocket parse error:', e);
+        console.error('Parse error:', e);
       }
     };
 
-    ws.onerror = (error) => {
-      console.error('WebSocket error:', error);
+    ws.onerror = () => {
       setState(prev => ({ ...prev, error: 'WebSocket connection error' }));
     };
 
     ws.onclose = () => {
       console.log('🔌 AWS WebSocket disconnected');
-      setState(prev => ({ 
-        ...prev, 
-        connected: false, 
-        streaming: false,
-      }));
+      setState(prev => ({ ...prev, connected: false, streaming: false }));
     };
 
     wsRef.current = ws;
     return sid;
   }, []);
 
-  // Disconnect WebSocket
   const disconnect = useCallback(() => {
     stopStreaming();
     if (wsRef.current) {
@@ -118,20 +154,18 @@ export function useAWSPurity() {
     }));
   }, []);
 
-  // Start browser camera and streaming
+  // Optimized streaming with backpressure control
   const startStreaming = useCallback(async (deviceId?: string) => {
     try {
-      // Get camera stream
       const constraints: MediaStreamConstraints = {
         video: deviceId 
-          ? { deviceId: { exact: deviceId }, width: 640, height: 480 }
-          : { width: 640, height: 480 }
+          ? { deviceId: { exact: deviceId }, width: FRAME_WIDTH, height: FRAME_HEIGHT }
+          : { width: FRAME_WIDTH, height: FRAME_HEIGHT }
       };
       
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
       streamRef.current = stream;
       
-      // Create hidden video element
       const video = document.createElement('video');
       video.srcObject = stream;
       video.autoplay = true;
@@ -139,39 +173,41 @@ export function useAWSPurity() {
       await video.play();
       videoRef.current = video;
       
-      // Create canvas for frame capture
       const canvas = document.createElement('canvas');
-      canvas.width = 640;
-      canvas.height = 480;
+      canvas.width = FRAME_WIDTH;
+      canvas.height = FRAME_HEIGHT;
       canvasRef.current = canvas;
       
       setState(prev => ({ ...prev, streaming: true }));
       
-      // Start sending frames
+      // Send frames with backpressure (skip if previous not processed)
       const sendFrame = () => {
-        if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
-          return;
-        }
-        if (!videoRef.current || !canvasRef.current) {
+        if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
+        if (!videoRef.current || !canvasRef.current) return;
+        
+        // BACKPRESSURE: Skip frame if still waiting for previous response
+        if (pendingRef.current) {
+          console.log('⏭️ Skipping frame (backpressure)');
           return;
         }
         
         const ctx = canvasRef.current.getContext('2d');
         if (!ctx) return;
         
-        ctx.drawImage(videoRef.current, 0, 0, 640, 480);
-        const dataUrl = canvasRef.current.toDataURL('image/jpeg', 0.7);
+        ctx.drawImage(videoRef.current, 0, 0, FRAME_WIDTH, FRAME_HEIGHT);
         
-        wsRef.current.send(JSON.stringify({
-          action: 'frame',
-          data: dataUrl
-        }));
+        // Use toBlob for efficiency (async, non-blocking)
+        canvasRef.current.toBlob((blob) => {
+          if (blob && wsRef.current?.readyState === WebSocket.OPEN && !pendingRef.current) {
+            pendingRef.current = true;
+            frameTimestampRef.current = Date.now();
+            wsRef.current.send(blob);  // Send binary directly (no base64 overhead)
+          }
+        }, 'image/jpeg', JPEG_QUALITY);
       };
       
-      // Send frames at ~20 FPS (50ms interval)
-      frameIntervalRef.current = window.setInterval(sendFrame, 50);
-      
-      console.log('📸 Browser camera streaming started');
+      frameIntervalRef.current = window.setInterval(sendFrame, FRAME_INTERVAL_MS);
+      console.log(`📸 Optimized streaming started (${FRAME_WIDTH}x${FRAME_HEIGHT} @ ${1000/FRAME_INTERVAL_MS} FPS)`);
       
     } catch (error) {
       console.error('Failed to start camera:', error);
@@ -179,7 +215,6 @@ export function useAWSPurity() {
     }
   }, []);
 
-  // Stop streaming
   const stopStreaming = useCallback(() => {
     if (frameIntervalRef.current) {
       clearInterval(frameIntervalRef.current);
@@ -191,30 +226,33 @@ export function useAWSPurity() {
       streamRef.current = null;
     }
     
+    // Clean up blob URL
+    setState(prev => {
+      if (prev.annotatedFrame?.startsWith('blob:')) {
+        URL.revokeObjectURL(prev.annotatedFrame);
+      }
+      return { ...prev, streaming: false, annotatedFrame: null };
+    });
+    
     videoRef.current = null;
     canvasRef.current = null;
-    
-    setState(prev => ({ 
-      ...prev, 
-      streaming: false,
-      annotatedFrame: null 
-    }));
-    
-    console.log('📸 Browser camera streaming stopped');
+    pendingRef.current = false;
   }, []);
 
-  // Reset detection state
   const reset = useCallback(() => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify({ action: 'reset' }));
+      // Send control message with 0x00 prefix for binary endpoint
+      const controlMsg = JSON.stringify({ action: 'reset' });
+      const controlBytes = new TextEncoder().encode(controlMsg);
+      const packet = new Uint8Array(1 + controlBytes.length);
+      packet[0] = 0x00;  // Control prefix
+      packet.set(controlBytes, 1);
+      wsRef.current.send(packet.buffer);
     }
   }, []);
 
-  // Cleanup on unmount
   useEffect(() => {
-    return () => {
-      disconnect();
-    };
+    return () => disconnect();
   }, [disconnect]);
 
   return {

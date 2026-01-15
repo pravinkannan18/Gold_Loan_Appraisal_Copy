@@ -27,6 +27,7 @@ export function AWSPurityTesting() {
     status,
     fps,
     processMs,
+    latency,
     error,
     connect,
     disconnect,
@@ -285,9 +286,12 @@ export function AWSPurityTesting() {
                   <Clock className="w-3 h-3 text-blue-400" />
                   {processMs.toFixed(0)} ms
                 </span>
+                <span className="flex items-center gap-1 text-green-400">
+                  ⚡ {latency}ms RTT
+                </span>
                 <span className="flex items-center gap-1">
                   <Cloud className="w-3 h-3 text-orange-400" />
-                  AWS
+                  Binary
                 </span>
               </div>
             )}

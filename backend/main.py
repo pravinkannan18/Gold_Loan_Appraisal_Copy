@@ -30,10 +30,6 @@ from routers import appraiser, appraisal, camera, face, purity, gps, purity_fast
 # FastAPI App Initialization
 # ============================================================================
 
-print("\n" + "="*70)
-print("  Gold Loan Appraisal API - Initializing...")
-print("="*70 + "\n")
-
 app = FastAPI(
     title="Gold Loan Appraisal API",
     version="2.0.0",
@@ -58,37 +54,26 @@ app.add_middleware(
 # Initialize Services (Singleton Pattern)
 # ============================================================================
 
-print("Initializing services...")
-
 # Database
 db = Database()
-print("✓ Database initialized")
 
 # Camera Service
 camera_service = CameraService()
-print("✓ Camera service initialized")
 
 # Facial Recognition Service
 facial_service = FacialRecognitionService(db)
-print(f"✓ Facial recognition service initialized (Available: {facial_service.is_available()})")
 
 # Purity Testing Service
 purity_service = PurityTestingService(database=db)
-print(f"✓ Purity testing service initialized (Available: {purity_service.is_available()})")
 
 # Fast Purity Testing Service (Optimized WebSocket)
 fast_purity_service = get_fast_purity_service()
-print(f"✓ Fast purity service initialized (Available: {fast_purity_service.is_available()}, Device: {fast_purity_service.device})")
 
 # AWS Purity Testing Service (Cloud-compatible)
 aws_purity_service = get_aws_purity_service()
-print(f"✓ AWS purity service initialized (Available: {aws_purity_service.is_available()}, Device: {aws_purity_service.device})")
 
 # GPS Service
 gps_service = GPSService()
-print(f"✓ GPS service initialized")
-
-print()
 
 # ============================================================================
 # Dependency Injection for Routers
@@ -168,49 +153,25 @@ async def get_statistics():
 @app.on_event("startup")
 async def startup_event():
     """Initialize database and services on startup"""
-    print("\n" + "="*70)
-    print("  Application Starting...")
-    print("="*70)
-    
     # Initialize database tables
     db.init_database()
-    print("✓ Database tables initialized")
     
     # Test database connection
-    if db.test_connection():
-        print("✓ Database connection successful")
-    else:
-        print("✗ Database connection failed")
-    
-    print("="*70)
-    print("  Server Ready!")
-    print("  API Docs: http://localhost:8000/docs")
-    print("="*70 + "\n")
+    db.test_connection()
 
 @app.on_event("shutdown")
 async def shutdown_event():
     """Cleanup on shutdown"""
-    print("\n" + "="*70)
-    print("  Application Shutting Down...")
-    print("="*70)
-    
     # Stop purity testing if running
     if purity_service.is_running:
         purity_service.stop()
-        print("✓ Purity testing service stopped")
     
     # Stop fast purity testing if running
     if fast_purity_service.is_running:
         fast_purity_service.stop()
-        print("✓ Fast purity testing service stopped")
     
     # Close database connections
     db.close()
-    print("✓ Database connections closed")
-    
-    print("="*70)
-    print("  Shutdown Complete")
-    print("="*70 + "\n")
 
 # ============================================================================
 # Run Server
