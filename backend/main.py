@@ -1,8 +1,13 @@
 """
 Gold Loan Appraisal API - Main Application
 Clean architecture with routers, services, and models separation
+WebRTC-based real-time video streaming with aiortc
 """
 import os
+
+# Suppress ONNX Runtime CUDA warnings (YOLO uses PyTorch directly, not ONNX)
+os.environ["ORT_LOG_LEVEL"] = "ERROR"  # Suppress ONNX Runtime warnings
+os.environ["ORT_DISABLE_CUDA"] = "1"   # Don't try to load CUDA for ONNX
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 
 from fastapi import FastAPI
@@ -18,13 +23,10 @@ load_dotenv()
 from models.database import Database
 from services.camera_service import CameraService
 from services.facial_recognition_service import FacialRecognitionService
-from services.purity_testing_service import PurityTestingService
-from services.fast_purity_service import get_fast_purity_service
-from services.aws_purity_service import get_aws_purity_service
 from services.gps_service import GPSService
 
 # Import routers
-from routers import appraiser, appraisal, camera, face, purity, gps, purity_fast, purity_aws
+from routers import appraiser, appraisal, camera, face, gps, webrtc
 
 # ============================================================================
 # FastAPI App Initialization
@@ -32,8 +34,8 @@ from routers import appraiser, appraisal, camera, face, purity, gps, purity_fast
 
 app = FastAPI(
     title="Gold Loan Appraisal API",
-    version="2.0.0",
-    description="Backend API for Gold Loan Appraisal System with camera, facial recognition, purity testing, and GPS"
+    version="3.0.0",
+    description="Backend API for Gold Loan Appraisal System with WebRTC video streaming, facial recognition, and GPS"
 )
 
 # ============================================================================
@@ -63,15 +65,6 @@ camera_service = CameraService()
 # Facial Recognition Service
 facial_service = FacialRecognitionService(db)
 
-# Purity Testing Service
-purity_service = PurityTestingService(database=db)
-
-# Fast Purity Testing Service (Optimized WebSocket)
-fast_purity_service = get_fast_purity_service()
-
-# AWS Purity Testing Service (Cloud-compatible)
-aws_purity_service = get_aws_purity_service()
-
 # GPS Service
 gps_service = GPSService()
 
@@ -84,9 +77,6 @@ appraiser.set_database(db)
 appraisal.set_database(db)
 camera.set_service(camera_service)
 face.set_service(facial_service)
-purity.set_service(purity_service)
-purity_fast.set_service(fast_purity_service)
-purity_aws.set_service(aws_purity_service)
 gps.set_service(gps_service)
 
 # ============================================================================
@@ -97,10 +87,8 @@ app.include_router(appraiser.router)
 app.include_router(appraisal.router)
 app.include_router(camera.router)
 app.include_router(face.router)
-app.include_router(purity.router)
-app.include_router(purity_fast.router)
-app.include_router(purity_aws.router)
 app.include_router(gps.router)
+app.include_router(webrtc.router)
 
 # ============================================================================
 # Root Endpoints
@@ -111,7 +99,7 @@ async def root():
     """API information endpoint"""
     return {
         "message": "Gold Loan Appraisal API",
-        "version": "2.0.0",
+        "version": "3.0.0",
         "status": "running",
         "docs": "/docs",
         "endpoints": {
@@ -119,7 +107,7 @@ async def root():
             "appraisal": "/api/appraisal",
             "camera": "/api/camera",
             "face": "/api/face",
-            "purity": "/api/purity",
+            "webrtc": "/api/webrtc",
             "gps": "/api/gps"
         }
     }
@@ -129,6 +117,9 @@ async def health_check():
     """Health check endpoint"""
     db_status = db.test_connection()
     
+    # Import webrtc service for health check
+    from webrtc.signaling import webrtc_manager
+    
     return {
         "status": "healthy",
         "timestamp": datetime.now().isoformat(),
@@ -136,7 +127,7 @@ async def health_check():
             "database": "connected" if db_status else "disconnected",
             "camera": "available" if camera_service.check_camera_available() else "unavailable",
             "facial_recognition": "available" if facial_service.is_available() else "unavailable",
-            "purity_testing": "available" if purity_service.is_available() else "unavailable",
+            "webrtc": "available" if webrtc_manager.is_available() else "unavailable",
             "gps": "available" if gps_service.available else "unavailable"
         }
     }
@@ -158,17 +149,17 @@ async def startup_event():
     
     # Test database connection
     db.test_connection()
+    
+    # Initialize WebRTC and inference
+    from webrtc.signaling import webrtc_manager
+    webrtc_manager.initialize()
 
 @app.on_event("shutdown")
 async def shutdown_event():
     """Cleanup on shutdown"""
-    # Stop purity testing if running
-    if purity_service.is_running:
-        purity_service.stop()
-    
-    # Stop fast purity testing if running
-    if fast_purity_service.is_running:
-        fast_purity_service.stop()
+    # Cleanup WebRTC sessions
+    from webrtc.signaling import webrtc_manager
+    await webrtc_manager.cleanup()
     
     # Close database connections
     db.close()
