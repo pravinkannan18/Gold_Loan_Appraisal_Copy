@@ -31,9 +31,8 @@ export const HoverButton = React.forwardRef<HTMLButtonElement, HoverButtonProps>
     const createCircle = React.useCallback((x: number, y: number) => {
       const buttonWidth = buttonRef.current?.offsetWidth || 0;
       const xPos = buttonWidth ? x / buttonWidth : 0;
-      const color = `linear-gradient(to right, var(--circle-start) ${xPos * 100}%, var(--circle-end) ${
-        xPos * 100
-      }%)`;
+      const color = `linear-gradient(to right, var(--circle-start) ${xPos * 100}%, var(--circle-end) ${xPos * 100
+        }%)`;
 
       setCircles((prev) => [
         ...prev,
@@ -92,8 +91,8 @@ export const HoverButton = React.forwardRef<HTMLButtonElement, HoverButtonProps>
     }, [circles]);
 
     const inlineStyle: HoverButtonStyle = {
-      "--circle-start": "var(--tw-gradient-from, #93c5fd)",
-      "--circle-end": "var(--tw-gradient-to, #2563eb)",
+      "--circle-start": "var(--tw-gradient-from, #A78BFA)",
+      "--circle-end": "var(--tw-gradient-to, #101585)",
       ...props.style,
     };
 
@@ -108,15 +107,15 @@ export const HoverButton = React.forwardRef<HTMLButtonElement, HoverButtonProps>
           }
         }}
         className={cn(
-          "relative isolate inline-flex items-center justify-center gap-2 whitespace-nowrap px-8 py-3 rounded-3xl",
-          "font-medium text-base leading-6 text-white",
-          "bg-gradient-to-r from-blue-500 via-indigo-500 to-blue-600",
-          "shadow-lg shadow-blue-500/30 backdrop-blur-md cursor-pointer overflow-hidden",
-          "transition-transform duration-300 ease-out hover:translate-y-1",
+          "relative isolate inline-flex items-center justify-center gap-2 whitespace-nowrap px-8 py-3 rounded-full",
+          "font-semibold text-base leading-6 text-[#FFDD44]",
+          "bg-gradient-to-r from-[#101585] via-[#1a1f9e] to-[#101585]",
+          "shadow-lg shadow-[#101585]/30 backdrop-blur-md cursor-pointer overflow-hidden",
+          "transition-all duration-300 ease-out hover:-translate-y-1 hover:shadow-xl hover:shadow-[#FFDD44]/40",
           "before:content-[''] before:absolute before:inset-0",
           "before:rounded-[inherit] before:pointer-events-none",
           "before:z-[1]",
-          "before:shadow-[inset_0_0_0_1px_rgba(191,219,254,0.35),inset_0_0_20px_0_rgba(147,197,253,0.25),inset_0_-3px_16px_0_rgba(59,130,246,0.35),0_8px_20px_0_rgba(59,130,246,0.35)]",
+          "before:shadow-[inset_0_0_0_1px_rgba(167,139,250,0.35),inset_0_0_20px_0_rgba(167,139,250,0.15),inset_0_-3px_16px_0_rgba(16,21,133,0.35),0_8px_20px_0_rgba(16,21,133,0.25)]",
           "before:mix-blend-multiply before:transition-transform before:duration-300",
           "active:before:scale-[0.975]",
           className
@@ -132,10 +131,10 @@ export const HoverButton = React.forwardRef<HTMLButtonElement, HoverButtonProps>
             key={id}
             className={cn(
               "absolute w-3 h-3 -translate-x-1/2 -translate-y-1/2 rounded-full",
-              "blur-lg pointer-events-none z-[-1] transition-opacity duration-300",
-              fadeState === "in" && "opacity-75",
-              fadeState === "out" && "opacity-0 duration-[1.2s]",
-              !fadeState && "opacity-0"
+              "blur-lg pointer-events-none z-[-1] transition-opacity",
+              fadeState === "in" && "opacity-75 duration-300",
+              fadeState === "out" && "opacity-0 duration-1000",
+              !fadeState && "opacity-0 duration-300"
             )}
             style={{
               left: x,

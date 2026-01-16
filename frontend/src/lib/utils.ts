@@ -12,13 +12,12 @@ export function generateAppraiserId(): string {
 
 export function showToast(message: string, type: 'success' | 'error' | 'info' = 'info') {
   const toast = document.createElement('div');
-  toast.className = `fixed top-4 right-4 z-50 px-6 py-3 rounded-lg shadow-lg text-white font-medium animate-fade-in ${
-    type === 'success'
-      ? 'bg-green-500'
+  toast.className = `fixed top-4 right-4 z-50 px-6 py-3 rounded-xl shadow-lg font-medium animate-fade-in ${type === 'success'
+      ? 'bg-[#101585] text-[#FFDD44]'  /* Navy with yellow text */
       : type === 'error'
-      ? 'bg-red-500'
-      : 'bg-blue-500'
-  }`;
+        ? 'bg-red-500 text-white'
+        : 'bg-[#A78BFA] text-[#101585]'  /* Lavender with navy text */
+    }`;
   toast.textContent = message;
   document.body.appendChild(toast);
 

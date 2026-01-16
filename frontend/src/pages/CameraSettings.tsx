@@ -109,11 +109,11 @@ export function CameraSettings() {
     };
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-sky-100 p-8">
+        <div className="min-h-screen bg-gradient-to-br from-[hsl(48,50%,99%)] via-[hsl(158,30%,97%)] to-[hsl(320,100%,98%)] p-8">
             <div className="max-w-5xl mx-auto">
                 {/* Header */}
-                <div className="bg-white rounded-2xl shadow-xl border border-blue-200/50 overflow-hidden mb-6">
-                    <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-sky-600 p-6">
+                <div className="bg-white rounded-[30px] shadow-xl border border-[hsl(158,20%,88%)] overflow-hidden mb-6">
+                    <div className="bg-gradient-to-r from-[hsl(158,82%,18%)] via-[hsl(158,75%,22%)] to-[hsl(158,70%,25%)] p-6">
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-4">
                                 <div className="p-3 bg-white/20 rounded-xl backdrop-blur-sm">
@@ -121,7 +121,7 @@ export function CameraSettings() {
                                 </div>
                                 <div>
                                     <h1 className="text-2xl font-bold text-white">Camera Settings</h1>
-                                    <p className="text-blue-100">Configure cameras for each page</p>
+                                    <p className="text-[hsl(158,60%,85%)]">Configure cameras for each page</p>
                                 </div>
                             </div>
                             <div className="flex gap-2">
@@ -172,7 +172,7 @@ export function CameraSettings() {
                 {/* Available Cameras Summary */}
                 <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6 mb-6">
                     <h2 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-                        <Camera className="w-5 h-5 text-blue-600" />
+                        <Camera className="w-5 h-5 text-[hsl(158,82%,18%)]" />
                         Available Cameras ({cameras.length})
                     </h2>
 
@@ -194,9 +194,9 @@ export function CameraSettings() {
                             {cameras.map((camera, index) => (
                                 <div
                                     key={camera.deviceId}
-                                    className="flex items-center gap-3 p-3 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg"
+                                    className="flex items-center gap-3 p-3 bg-gradient-to-r from-[hsl(158,30%,95%)] to-[hsl(158,25%,92%)] border border-[hsl(158,25%,85%)] rounded-lg"
                                 >
-                                    <div className="flex-shrink-0 w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center font-bold text-sm">
+                                    <div className="flex-shrink-0 w-8 h-8 bg-[hsl(158,82%,18%)] text-white rounded-full flex items-center justify-center font-bold text-sm">
                                         {index + 1}
                                     </div>
                                     <div className="flex-1 min-w-0">
@@ -271,7 +271,7 @@ export function CameraSettings() {
                                             <Button
                                                 onClick={() => handleSaveCamera(config.context)}
                                                 size="sm"
-                                                className="bg-blue-600 hover:bg-blue-700 text-white"
+                                                className="bg-[hsl(158,82%,18%)] hover:bg-[hsl(158,82%,25%)] text-white"
                                             >
                                                 Set & Save
                                             </Button>
@@ -305,12 +305,12 @@ export function CameraSettings() {
                 </div>
 
                 {/* Help Text */}
-                <div className="mt-6 bg-blue-50 border border-blue-200 rounded-xl p-4">
-                    <h3 className="font-semibold text-blue-900 mb-2 flex items-center gap-2">
+                <div className="mt-6 bg-[hsl(158,30%,95%)] border border-[hsl(158,25%,85%)] rounded-xl p-4">
+                    <h3 className="font-semibold text-[hsl(158,82%,18%)] mb-2 flex items-center gap-2">
                         <AlertCircle className="w-4 h-4" />
                         How it works
                     </h3>
-                    <ul className="text-sm text-blue-800 space-y-1 ml-6 list-disc">
+                    <ul className="text-sm text-[hsl(158,40%,30%)] space-y-1 ml-6 list-disc">
                         <li>Configure cameras here or directly on each page</li>
                         <li>Each page remembers its own camera selection</li>
                         <li>Cameras auto-load when you visit each page</li>

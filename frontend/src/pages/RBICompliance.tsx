@@ -4,6 +4,7 @@ import { Camera, ArrowLeft, ArrowRight, Shield, CheckCircle, Sparkles, FileImage
 import { StepIndicator } from '../components/journey/StepIndicator';
 import { LiveCamera, LiveCameraHandle } from '../components/journey/LiveCamera';
 import { showToast } from '../lib/utils';
+import { AuroraLayout } from '../components/layouts/AuroraLayout';
 
 interface JewelleryItemCapture {
   itemNumber: number;
@@ -381,23 +382,23 @@ export function RBICompliance() {
   return (
     <div className="relative min-h-screen overflow-hidden">
       {/* Premium Animated Background */}
-      <div className="absolute inset-0 bg-gradient-to-br from-blue-50 via-indigo-50/50 to-violet-50/30 dark:from-slate-950 dark:via-blue-950/50 dark:to-violet-950/30" />
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_40%,_rgba(59,130,246,0.1),_transparent_50%),_radial-gradient(circle_at_70%_70%,_rgba(99,102,241,0.08),_transparent_50%),_radial-gradient(circle_at_50%_10%,_rgba(139,92,246,0.06),_transparent_40%)] animate-pulse" style={{ animationDuration: '8s' }} />
-      <div className="absolute inset-0 backdrop-blur-3xl bg-white/40 dark:bg-slate-900/40" />
+      <div className="absolute inset-0 bg-gradient-to-br from-[hsl(48,50%,99%)] via-[hsl(158,30%,97%)] to-[hsl(320,100%,98%)] dark:from-[hsl(158,30%,8%)] dark:via-[hsl(158,25%,10%)] dark:to-[hsl(320,50%,10%)]" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_40%,_rgba(9,84,61,0.08),_transparent_50%),_radial-gradient(circle_at_70%_70%,_rgba(255,169,233,0.1),_transparent_50%),_radial-gradient(circle_at_50%_10%,_rgba(9,84,61,0.05),_transparent_40%)] animate-pulse" style={{ animationDuration: '8s' }} />
+      <div className="absolute inset-0 backdrop-blur-3xl bg-white/40 dark:bg-[hsl(158,30%,8%)]/40" />
 
       {/* Premium Floating Orbs */}
-      <div className="absolute top-20 left-10 w-72 h-72 bg-blue-400/20 dark:bg-blue-500/10 rounded-full blur-3xl animate-pulse" style={{ animationDuration: '6s' }} />
-      <div className="absolute bottom-20 right-10 w-96 h-96 bg-indigo-400/20 dark:bg-indigo-500/10 rounded-full blur-3xl animate-pulse" style={{ animationDuration: '8s', animationDelay: '2s' }} />
+      <div className="absolute top-20 left-10 w-72 h-72 bg-[hsl(158,82%,18%,0.12)] dark:bg-[hsl(158,82%,18%,0.08)] rounded-full blur-3xl animate-pulse" style={{ animationDuration: '6s' }} />
+      <div className="absolute bottom-20 right-10 w-96 h-96 bg-[hsl(320,100%,83%,0.15)] dark:bg-[hsl(320,100%,83%,0.08)] rounded-full blur-3xl animate-pulse" style={{ animationDuration: '8s', animationDelay: '2s' }} />
 
       <div className="relative z-10">
         <StepIndicator currentStep={3} />
 
         {/* Full Width Premium Layout */}
         <div className="min-h-[calc(100vh-120px)]">
-          <div className="h-full bg-gradient-to-br from-white/95 via-white/90 to-blue-50/80 backdrop-blur-2xl dark:from-slate-900/95 dark:via-slate-900/90 dark:to-blue-950/80">
+          <div className="h-full bg-gradient-to-br from-white/95 via-white/90 to-[hsl(48,50%,97%)]/80 backdrop-blur-2xl dark:from-[hsl(158,30%,10%)]/95 dark:via-[hsl(158,25%,12%)]/90 dark:to-[hsl(158,30%,10%)]/80">
 
             {/* Premium Header with Gradient Overlay - Full Width */}
-            <div className="relative overflow-hidden bg-gradient-to-br from-blue-600 via-indigo-600 to-violet-700 px-8 py-8">
+            <div className="relative overflow-hidden bg-gradient-to-br from-[hsl(158,82%,18%)] via-[hsl(158,75%,22%)] to-[hsl(158,70%,25%)] px-8 py-8">
               {/* Animated Background Pattern */}
               <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxwYXRoIGQ9Ik0zNiAxOGMzLjMxNCAwIDYgMi42ODYgNiA2cy0yLjY4NiA2LTYgNi02LTIuNjg2LTYtNiAyLjY4Ni02IDYtNnptMCAwYzMuMzE0IDAgNiAyLjY4NiA2IDZzLTIuNjg2IDYtNiA2LTYtMi42ODYtNi02IDIuNjg2LTYgNi02eiIgc3Ryb2tlPSJyZ2JhKDI1NSwyNTUsMjU1LDAuMSkiIHN0cm9rZS13aWR0aD0iMSIvPjwvZz48L3N2Zz4=')] opacity-20" />
               <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-white/10 to-transparent rounded-full blur-3xl" />
@@ -416,12 +417,12 @@ export function RBICompliance() {
                       <p className="text-xs font-semibold uppercase tracking-[0.25em] text-white/90">RBI Compliance Documentation</p>
                     </div>
                     <h1 className="text-3xl font-bold text-white drop-shadow-2xl tracking-tight mb-1">Jewellery Image Capture</h1>
-                    <div className="flex items-center gap-2 text-sm text-blue-100">
+                    <div className="flex items-center gap-2 text-sm text-[hsl(158,60%,85%)]">
                       <span className="inline-flex items-center gap-1.5 rounded-full bg-white/20 px-3 py-0.5 backdrop-blur-sm">
-                        <span className="h-1.5 w-1.5 rounded-full bg-yellow-400 animate-pulse" />
+                        <span className="h-1.5 w-1.5 rounded-full bg-[hsl(320,100%,83%)] animate-pulse" />
                         Step 3 of 5
                       </span>
-                      <span className="text-blue-100/80">— Regulatory compliance imaging</span>
+                      <span className="text-[hsl(158,50%,80%)]">— Regulatory compliance imaging</span>
                     </div>
                   </div>
                 </div>

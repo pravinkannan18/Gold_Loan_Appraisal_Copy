@@ -1,4 +1,4 @@
-import { useState, useEffect ,useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -9,9 +9,9 @@ import {
   Shield,
   FlaskConical,
   CheckCircle,
-  MapPin, 
+  MapPin,
   Globe,
-  Loader2, 
+  Loader2,
   AlertCircle
 } from 'lucide-react';
 import { StepIndicator } from '../components/journey/StepIndicator';
@@ -79,23 +79,23 @@ export function AppraisalSummary() {
   const [gpsError, setGpsError] = useState<string | null>(null);
 
   const fetchGPS = useCallback(async () => {
-      setGpsLoading(true);
-      setGpsError(null);
-      try {
-        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/gps/location`, {
-          credentials: 'include', // if you use auth
-        });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
-        if (data.error) throw new Error(data.error);
-        setGpsData(data);
-      } catch (err: any) {
-        console.error('GPS fetch error:', err);
-        setGpsError(err.message || 'Failed to get location');
-      } finally {
-        setGpsLoading(false);
-      }
-    }, []);
+    setGpsLoading(true);
+    setGpsError(null);
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/gps/location`, {
+        credentials: 'include', // if you use auth
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      setGpsData(data);
+    } catch (err: any) {
+      console.error('GPS fetch error:', err);
+      setGpsError(err.message || 'Failed to get location');
+    } finally {
+      setGpsLoading(false);
+    }
+  }, []);
   useEffect(() => {
     const loadData = () => {
       const appraiserStr = localStorage.getItem('currentAppraiser');
@@ -117,7 +117,7 @@ export function AppraisalSummary() {
         console.error('Missing required data for AppraisalSummary');
         console.error('Missing items:', {
           appraiser: !appraiserStr,
-          frontImage: !frontImage, 
+          frontImage: !frontImage,
           items: !itemsStr,
           rbi: !rbiStr,
           purity: !purityStr
@@ -138,7 +138,7 @@ export function AppraisalSummary() {
       setAppraiser(JSON.parse(appraiserStr));
       setCustomerFront(frontImage);
       setCustomerSide(sideImage || '');
-      
+
       // Debug jewellery items structure
       const parsedItems = JSON.parse(itemsStr);
       console.log('=== APPRAISAL SUMMARY DEBUG ===');
@@ -150,7 +150,7 @@ export function AppraisalSummary() {
       console.log('Image value type:', typeof parsedItems[0].image);
       console.log('Image value length:', parsedItems[0].image?.length);
       console.log('=== END DEBUG ===');
-      
+
       setJewelleryItems(parsedItems);
       setRbiData(JSON.parse(rbiStr));
       const parsedPurityResults = JSON.parse(purityStr);
@@ -162,12 +162,12 @@ export function AppraisalSummary() {
     loadData();
   }, [navigate]);
 
-  
+
 
   const handleExportPDF = async () => {
     try {
       console.log('=== EXPORTING PDF ===');
-      
+
       if (!appraiser || !rbiData || !purityResults) {
         showToast('Missing appraisal data', 'error');
         return;
@@ -346,14 +346,14 @@ export function AppraisalSummary() {
       // Get existing records and add new one
       const existingRecords = JSON.parse(localStorage.getItem('appraisalRecords') || '[]');
       existingRecords.unshift(appraisalRecord); // Add to beginning
-      
+
       // Keep only last 50 records to prevent storage overflow
       if (existingRecords.length > 50) {
         existingRecords.splice(50);
       }
-      
+
       localStorage.setItem('appraisalRecords', JSON.stringify(existingRecords));
-      
+
       showToast('Appraisal completed and saved successfully!', 'success');
       clearAppraisalData();
       navigate('/');
@@ -370,12 +370,12 @@ export function AppraisalSummary() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-sky-100">
+    <div className="min-h-screen bg-gradient-to-br from-[hsl(48,50%,99%)] via-[hsl(158,30%,97%)] to-[hsl(320,100%,98%)]">
       <StepIndicator currentStep={5} />
 
       <div className="max-w-7xl mx-auto px-4 py-8">
-        <div className="bg-white/90 backdrop-blur-sm rounded-3xl shadow-2xl border border-blue-200/50 overflow-hidden">
-          <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-sky-600 p-8">
+        <div className="bg-white/90 backdrop-blur-sm rounded-[30px] shadow-2xl border border-[hsl(158,20%,88%)] overflow-hidden">
+          <div className="bg-gradient-to-r from-[hsl(158,82%,18%)] via-[hsl(158,75%,22%)] to-[hsl(158,70%,25%)] p-8">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
                 <div className="p-4 bg-white/20 rounded-2xl backdrop-blur-sm">
@@ -383,7 +383,7 @@ export function AppraisalSummary() {
                 </div>
                 <div>
                   <h1 className="text-3xl font-bold text-white tracking-wide">Appraisal Summary</h1>
-                  <p className="text-blue-100 text-lg font-medium">Final Review - Step 5 of 5</p>
+                  <p className="text-[hsl(158,60%,85%)] text-lg font-medium">Final Review - Step 5 of 5</p>
                 </div>
               </div>
               <button
@@ -397,10 +397,10 @@ export function AppraisalSummary() {
           </div>
 
           <div className="p-10 space-y-10">
-            <div className="bg-gradient-to-r from-blue-50 to-indigo-100 rounded-2xl p-8 border-2 border-blue-200/60 shadow-lg">
+            <div className="bg-gradient-to-r from-[hsl(158,30%,95%)] to-[hsl(158,25%,92%)] rounded-[30px] p-8 border-2 border-[hsl(158,25%,85%)] shadow-lg">
               <div className="flex items-center gap-4 mb-6">
-                <User className="w-8 h-8 text-blue-600" />
-                <h2 className="text-2xl font-bold text-blue-900 tracking-wide">Appraiser Information</h2>
+                <User className="w-8 h-8 text-[hsl(158,82%,18%)]" />
+                <h2 className="text-2xl font-bold text-[hsl(158,82%,18%)] tracking-wide">Appraiser Information</h2>
               </div>
               <div className="grid md:grid-cols-2 gap-8">
                 <div>
@@ -420,18 +420,18 @@ export function AppraisalSummary() {
               </div>
             </div>
 
-            <div className="bg-gradient-to-r from-blue-50 to-indigo-100 rounded-2xl p-8 border-2 border-blue-200/60 shadow-lg">
+            <div className="bg-gradient-to-r from-[hsl(158,30%,95%)] to-[hsl(158,25%,92%)] rounded-[30px] p-8 border-2 border-[hsl(158,25%,85%)] shadow-lg">
               <div className="flex items-center gap-4 mb-6">
-                <Camera className="w-8 h-8 text-blue-600" />
-                <h2 className="text-2xl font-bold text-blue-900 tracking-wide">Customer Images</h2>
+                <Camera className="w-8 h-8 text-[hsl(158,82%,18%)]" />
+                <h2 className="text-2xl font-bold text-[hsl(158,82%,18%)] tracking-wide">Customer Images</h2>
               </div>
               <div className="grid md:grid-cols-2 gap-8">
                 <div>
-                  <p className="text-lg font-bold text-blue-800 mb-4">Front View</p>
+                  <p className="text-lg font-bold text-[hsl(158,82%,18%)] mb-4">Front View</p>
                   <img
                     src={customerFront}
                     alt="Customer Front"
-                    className="w-full h-56 object-cover rounded-2xl border-4 border-blue-300 shadow-lg"
+                    className="w-full h-56 object-cover rounded-2xl border-4 border-[hsl(158,50%,75%)] shadow-lg"
                     onError={(e) => {
                       console.error('Failed to load customer front image:', customerFront?.substring(0, 50));
                       e.currentTarget.style.display = 'none';
@@ -443,11 +443,11 @@ export function AppraisalSummary() {
                 </div>
                 {customerSide && (
                   <div>
-                    <p className="text-lg font-bold text-blue-800 mb-4">Side View</p>
+                    <p className="text-lg font-bold text-[hsl(158,82%,18%)] mb-4">Side View</p>
                     <img
                       src={customerSide}
                       alt="Customer Side"
-                      className="w-full h-56 object-cover rounded-2xl border-4 border-blue-300 shadow-lg"
+                      className="w-full h-56 object-cover rounded-2xl border-4 border-[hsl(158,50%,75%)] shadow-lg"
                       onError={(e) => {
                         console.error('Failed to load customer side image:', customerSide?.substring(0, 50));
                         e.currentTarget.style.display = 'none';
@@ -461,10 +461,10 @@ export function AppraisalSummary() {
               </div>
             </div>
 
-            <div className="bg-gradient-to-r from-blue-50 to-indigo-100 rounded-2xl p-8 border-2 border-blue-200/60 shadow-lg">
+            <div className="bg-gradient-to-r from-[hsl(158,30%,95%)] to-[hsl(158,25%,92%)] rounded-[30px] p-8 border-2 border-[hsl(158,25%,85%)] shadow-lg">
               <div className="flex items-center gap-4 mb-6">
-                <Shield className="w-8 h-8 text-blue-600" />
-                <h2 className="text-2xl font-bold text-blue-900 tracking-wide">RBI Compliance</h2>
+                <Shield className="w-8 h-8 text-[hsl(158,82%,18%)]" />
+                <h2 className="text-2xl font-bold text-[hsl(158,82%,18%)] tracking-wide">RBI Compliance</h2>
               </div>
               <div className="space-y-6">
                 <div>
@@ -522,36 +522,32 @@ export function AppraisalSummary() {
               </div>
             </div>
 
-            <div className="bg-gradient-to-r from-blue-50 to-indigo-100 rounded-2xl p-8 border-2 border-blue-200/60 shadow-lg">
+            <div className="bg-gradient-to-r from-[hsl(158,30%,95%)] to-[hsl(158,25%,92%)] rounded-[30px] p-8 border-2 border-[hsl(158,25%,85%)] shadow-lg">
               <div className="flex items-center gap-4 mb-6">
-                <FlaskConical className="w-8 h-8 text-blue-600" />
-                <h2 className="text-2xl font-bold text-blue-900 tracking-wide">Purity Testing</h2>
+                <FlaskConical className="w-8 h-8 text-[hsl(158,82%,18%)]" />
+                <h2 className="text-2xl font-bold text-[hsl(158,82%,18%)] tracking-wide">Purity Testing</h2>
               </div>
               <div className="space-y-6">
                 {purityResults ? (
                   <div className="bg-white/80 backdrop-blur-sm p-6 rounded-2xl border-2 border-blue-200/50 shadow-md">
                     <div className="grid md:grid-cols-2 gap-6 mb-6">
-                      <div className={`p-4 rounded-xl border-2 ${
-                        purityResults.rubbingCompleted 
-                          ? 'bg-emerald-50 border-emerald-400' 
-                          : 'bg-gray-50 border-gray-300'
-                      }`}>
-                        <p className="text-sm text-blue-600 font-semibold mb-2">Rubbing Test</p>
-                        <p className={`text-lg font-bold ${
-                          purityResults.rubbingCompleted ? 'text-emerald-700' : 'text-gray-600'
+                      <div className={`p-4 rounded-xl border-2 ${purityResults.rubbingCompleted
+                        ? 'bg-emerald-50 border-emerald-400'
+                        : 'bg-gray-50 border-gray-300'
                         }`}>
+                        <p className="text-sm text-blue-600 font-semibold mb-2">Rubbing Test</p>
+                        <p className={`text-lg font-bold ${purityResults.rubbingCompleted ? 'text-emerald-700' : 'text-gray-600'
+                          }`}>
                           {purityResults.rubbingCompleted ? '✅ Completed' : '⏳ Not Completed'}
                         </p>
                       </div>
-                      <div className={`p-4 rounded-xl border-2 ${
-                        purityResults.acidCompleted 
-                          ? 'bg-blue-50 border-blue-400' 
-                          : 'bg-gray-50 border-gray-300'
-                      }`}>
-                        <p className="text-sm text-blue-600 font-semibold mb-2">Acid Test</p>
-                        <p className={`text-lg font-bold ${
-                          purityResults.acidCompleted ? 'text-blue-700' : 'text-gray-600'
+                      <div className={`p-4 rounded-xl border-2 ${purityResults.acidCompleted
+                        ? 'bg-blue-50 border-blue-400'
+                        : 'bg-gray-50 border-gray-300'
                         }`}>
+                        <p className="text-sm text-blue-600 font-semibold mb-2">Acid Test</p>
+                        <p className={`text-lg font-bold ${purityResults.acidCompleted ? 'text-blue-700' : 'text-gray-600'
+                          }`}>
                           {purityResults.acidCompleted ? '✅ Completed' : '⏳ Not Completed'}
                         </p>
                       </div>
@@ -580,67 +576,67 @@ export function AppraisalSummary() {
               </div>
             </div>
             {/* PASTE GPS SECTION HERE */}
-      <div className="bg-gradient-to-r from-teal-50 to-cyan-100 rounded-2xl p-8 border-2 border-teal-200/60 shadow-lg">
-        <div className="flex items-center gap-4 mb-6">
-          <MapPin className="w-8 h-8 text-teal-600" />
-          <h2 className="text-2xl font-bold text-teal-900 tracking-wide">GPS Location</h2>
-        </div>
+            <div className="bg-gradient-to-r from-teal-50 to-cyan-100 rounded-2xl p-8 border-2 border-teal-200/60 shadow-lg">
+              <div className="flex items-center gap-4 mb-6">
+                <MapPin className="w-8 h-8 text-teal-600" />
+                <h2 className="text-2xl font-bold text-teal-900 tracking-wide">GPS Location</h2>
+              </div>
 
-        {gpsLoading ? (
-          <div className="flex items-center gap-2 text-teal-600">
-            <Loader2 className="h-5 w-5 animate-spin" />
-            <span className="font-medium">Getting current location...</span>
-          </div>
-        ) : gpsError ? (
-          <div className="flex items-center gap-2 text-red-600">
-            <AlertCircle className="h-5 w-5" />
-            <span className="font-medium">{gpsError}</span>
-          </div>
-        ) : gpsData ? (
-          <div className="grid md:grid-cols-2 gap-8 items-start">
-            {/* Left: Map */}
-            <div className="flex justify-center">
-              {gpsData.map_image ? (
-                <img
-                  src={gpsData.map_image}
-                  alt="GPS Map"
-                  className="w-48 h-48 rounded-2xl shadow-xl border-2 border-teal-200 object-cover"
-                />
-              ) : (
-                <div className="w-48 h-48 bg-gray-100 rounded-2xl border-2 border-teal-200 flex items-center justify-center">
-                  <p className="text-gray-500 text-sm">Map not available</p>
+              {gpsLoading ? (
+                <div className="flex items-center gap-2 text-teal-600">
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                  <span className="font-medium">Getting current location...</span>
                 </div>
+              ) : gpsError ? (
+                <div className="flex items-center gap-2 text-red-600">
+                  <AlertCircle className="h-5 w-5" />
+                  <span className="font-medium">{gpsError}</span>
+                </div>
+              ) : gpsData ? (
+                <div className="grid md:grid-cols-2 gap-8 items-start">
+                  {/* Left: Map */}
+                  <div className="flex justify-center">
+                    {gpsData.map_image ? (
+                      <img
+                        src={gpsData.map_image}
+                        alt="GPS Map"
+                        className="w-48 h-48 rounded-2xl shadow-xl border-2 border-teal-200 object-cover"
+                      />
+                    ) : (
+                      <div className="w-48 h-48 bg-gray-100 rounded-2xl border-2 border-teal-200 flex items-center justify-center">
+                        <p className="text-gray-500 text-sm">Map not available</p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Right: Details */}
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2 text-sm font-semibold text-teal-700">
+                      <MapPin className="h-5 w-5" />
+                      <span>
+                        {gpsData.latitude.toFixed(6)}, {gpsData.longitude.toFixed(6)}
+                      </span>
+                      <Globe className="h-4 w-4 text-cyan-600" />
+                      <span className="text-xs uppercase tracking-wider">
+                        {gpsData.source}
+                      </span>
+                    </div>
+
+                    <p className="text-teal-700 font-medium">
+                      {gpsData.address || 'Address not available'}
+                    </p>
+
+                    <p className="text-xs text-teal-600">
+                      Captured: {formatTimestamp(new Date(gpsData.timestamp))}
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-teal-700 font-medium">No location data available</p>
               )}
             </div>
 
-            {/* Right: Details */}
-            <div className="space-y-3">
-              <div className="flex items-center gap-2 text-sm font-semibold text-teal-700">
-                <MapPin className="h-5 w-5" />
-                <span>
-                  {gpsData.latitude.toFixed(6)}, {gpsData.longitude.toFixed(6)}
-                </span>
-                <Globe className="h-4 w-4 text-cyan-600" />
-                <span className="text-xs uppercase tracking-wider">
-                  {gpsData.source}
-                </span>
-              </div>
 
-              <p className="text-teal-700 font-medium">
-                {gpsData.address || 'Address not available'}
-              </p>
-
-              <p className="text-xs text-teal-600">
-                Captured: {formatTimestamp(new Date(gpsData.timestamp))}
-              </p>
-            </div>
-          </div>
-        ) : (
-          <p className="text-teal-700 font-medium">No location data available</p>
-        )}
-      </div>
-
-            
 
             <div className="bg-gradient-to-br from-emerald-50 to-green-50 rounded-2xl p-8 border-2 border-emerald-200/60 shadow-lg">
               <div className="flex items-center gap-4">
@@ -656,7 +652,7 @@ export function AppraisalSummary() {
               </div>
             </div>
           </div>
-          
+
 
           <div className="bg-gradient-to-r from-blue-100 to-indigo-100 px-10 py-8 flex justify-between border-t border-blue-200/50">
             <button

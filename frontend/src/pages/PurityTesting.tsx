@@ -6,6 +6,7 @@ import { showToast } from '../lib/utils';
 import { Button } from '../components/ui/button';
 import { PageCameraSelector } from '../components/ui/page-camera-selector';
 import { useCameraDetection } from '../hooks/useCameraDetection';
+import { AuroraLayout } from '../components/layouts/AuroraLayout';
 import QRCode from 'qrcode';
 import jsPDF from 'jspdf';
 
@@ -629,15 +630,15 @@ export function PurityTesting() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-sky-100">
+    <div className="min-h-screen bg-gradient-to-br from-[hsl(48,50%,99%)] via-[hsl(158,30%,97%)] to-[hsl(320,100%,98%)]">
       <StepIndicator currentStep={4} />
 
       <div className="w-full px-6 py-8">
         {/* Camera Selection Panel */}
         {showCameraSelection && (
-          <div className="mb-6 bg-white/95 backdrop-blur-sm rounded-2xl p-6 shadow-xl border-2 border-blue-300">
+          <div className="mb-6 bg-white/95 backdrop-blur-sm rounded-[30px] p-6 shadow-xl border-2 border-[hsl(158,25%,85%)]">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xl font-bold text-blue-700 flex items-center">
+              <h3 className="text-xl font-bold text-[hsl(158,82%,18%)] flex items-center">
                 <ScanLine className="w-6 h-6 mr-2" />
                 Camera Configuration
               </h3>
@@ -724,8 +725,8 @@ export function PurityTesting() {
           </div>
         )}
 
-        <div className="bg-white/90 backdrop-blur-sm rounded-3xl shadow-2xl border border-blue-200/50 overflow-hidden">
-          <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-sky-600 p-8">
+        <div className="bg-white/90 backdrop-blur-sm rounded-[30px] shadow-2xl border border-[hsl(158,20%,88%)] overflow-hidden">
+          <div className="bg-gradient-to-r from-[hsl(158,82%,18%)] via-[hsl(158,75%,22%)] to-[hsl(158,70%,25%)] p-8">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
                 <div className="p-4 bg-white/20 rounded-2xl backdrop-blur-sm">
@@ -733,7 +734,7 @@ export function PurityTesting() {
                 </div>
                 <div>
                   <h1 className="text-3xl font-bold text-white tracking-wide">Purity Testing</h1>
-                  <p className="text-blue-100 text-lg font-medium">Step 4 of 5 — Gold Purity Analysis</p>
+                  <p className="text-[hsl(158,60%,85%)] text-lg font-medium">Step 4 of 5 — Gold Purity Analysis</p>
                 </div>
               </div>
               <Button
@@ -754,17 +755,17 @@ export function PurityTesting() {
 
           <div className="p-10 space-y-8">
             {/* Backend-Powered Dual Camera Analysis */}
-            <div className="bg-gradient-to-br from-blue-50 via-indigo-50 to-sky-50 border-2 border-blue-200/60 rounded-2xl p-8 shadow-lg">
-              <h3 className="text-2xl font-bold text-blue-900 mb-6 tracking-wide">Backend-Powered Purity Analysis</h3>
+            <div className="bg-gradient-to-br from-[hsl(158,30%,95%)] via-[hsl(158,25%,93%)] to-[hsl(320,50%,97%)] border-2 border-[hsl(158,25%,85%)] rounded-[30px] p-8 shadow-lg">
+              <h3 className="text-2xl font-bold text-[hsl(158,82%,18%)] mb-6 tracking-wide">Backend-Powered Purity Analysis</h3>
 
               <div className="flex flex-col items-center gap-3">
                 {selectedCameraId && (
-                  <div className="text-sm text-blue-700 bg-blue-100 px-4 py-2 rounded-lg font-semibold flex items-center gap-2">
+                  <div className="text-sm text-[hsl(158,82%,18%)] bg-[hsl(158,30%,92%)] px-4 py-2 rounded-lg font-semibold flex items-center gap-2">
                     <div className={`${isAnalysisActive ? 'bg-green-600 animate-pulse' : 'bg-blue-600'} w-2 h-2 rounded-full`}></div>
                     Using {selectedCameraLabel}
                   </div>
                 )}
-                <p className="text-sm text-blue-600 italic">Start analysis stream to detect Rubbing and Acid tests</p>
+                <p className="text-sm text-[hsl(158,50%,35%)] italic">Start analysis stream to detect Rubbing and Acid tests</p>
               </div>
             </div>
 
@@ -773,7 +774,7 @@ export function PurityTesting() {
               {/* Primary Analysis Stream */}
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <h4 className="text-lg font-bold text-blue-800">📸 Purity Analysis Stream</h4>
+                  <h4 className="text-lg font-bold text-[hsl(158,82%,18%)]">📸 Purity Analysis Stream</h4>
                   <div className="flex items-center gap-2">
                     <Button
                       onClick={toggleAnalysis}

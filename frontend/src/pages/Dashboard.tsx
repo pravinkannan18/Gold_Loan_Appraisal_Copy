@@ -157,127 +157,125 @@ const Dashboard = () => {
 
   const goldAppraisalSlides = [
     {
-      title: "Gold Jewelry",
-      image: "/bangle.png",
+      title: "Gold Jewelry Set",
+      image: "/hero_jewelry_1.png",
     },
     {
-      title: "Gold Necklace",
-      image: "/chain.png",
+      title: "Traditional Bangles",
+      image: "/hero_jewelry_2.png",
     },
     {
-      title: "Gold Rings",
-      image: "/ring.png",
+      title: "Designer Rings",
+      image: "/hero_jewelry_3.png",
     },
     {
-      title: "Gold Bangles",
-      image: "/neckless.png",
+      title: "Premium Pendant",
+      image: "/hero_jewelry_4.png",
     },
   ];
 
   return (
-    <AuroraLayout>
-      <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(59,130,246,0.12),_transparent_45%),_radial-gradient(circle_at_bottom,_rgba(14,165,233,0.18),_transparent_55%)]">
-        {/* Header */}
-        <header className="border-b border-neutral-200/50 dark:border-neutral-700/50 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-xl shadow-sm">
-          <div className="max-w-7xl mx-auto px-6 py-2.5 flex items-center justify-end">
-            <div className="flex items-center gap-3">
-              <span className="text-xs text-neutral-600 dark:text-neutral-400">{userName}</span>
-              <Button variant="ghost" size="sm" onClick={() => navigate('/camera-settings')} className="h-8 text-xs">
-                <Settings className="mr-1.5 h-3.5 w-3.5" />
-                Settings
-              </Button>
-              <Button variant="ghost" size="sm" onClick={handleSignOut} className="h-8 text-xs">
-                <LogOut className="mr-1.5 h-3.5 w-3.5" />
-                Sign Out
-              </Button>
-            </div>
+    <div className="min-h-screen bg-[#FFFDF7]">
+      {/* Header */}
+      <header className="border-b border-[hsl(158,20%,90%)] bg-white/90 dark:bg-[hsl(158,30%,10%)]/90 backdrop-blur-xl shadow-sm">
+        <div className="max-w-7xl mx-auto px-6 py-2.5 flex items-center justify-end">
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-[hsl(158,82%,18%)] dark:text-[hsl(48,30%,85%)]">{userName}</span>
+            <Button variant="ghost" size="sm" onClick={() => navigate('/camera-settings')} className="h-8 text-xs">
+              <Settings className="mr-1.5 h-3.5 w-3.5" />
+              Settings
+            </Button>
+            <Button variant="ghost" size="sm" onClick={handleSignOut} className="h-8 text-xs">
+              <LogOut className="mr-1.5 h-3.5 w-3.5" />
+              Sign Out
+            </Button>
           </div>
-        </header>
+        </div>
+      </header>
 
-        {/* Logo Section */}
-        <div className="flex justify-start px-6 py-3">
-          <img
-            src="/Embsys%20Intelligence%20logo.png"
-            alt="Embsys Intelligence"
-            className="h-24 w-auto"
+      {/* Logo Section */}
+      <div className="flex justify-start px-6 py-3">
+        <img
+          src="/Embsys%20Intelligence%20logo.png"
+          alt="Embsys Intelligence"
+          className="h-24 w-auto"
+        />
+      </div>
+
+      {/* Hero Section */}
+      <main className="px-4 py-2">
+        <div className="[&_[data-diced-top-text]]:font-semibold [&_[data-diced-main-text]]:font-bold [&_[data-diced-main-text]]:leading-tight [&_[data-diced-sub-text]]:leading-relaxed [&_[data-diced-sub-text]]:font-normal lobster-subtext">
+          <DicedHeroSection
+            topText="AI-Powered Gold Appraisals"
+            mainText="Gold Guardian Pro"
+            subMainText="Fast, accurate gold jewelry appraisals powered by AI technology—optimized for banking workflows and compliance."
+            buttonText="Start Appraisal"
+            slides={goldAppraisalSlides}
+            onMainButtonClick={handleStartAppraisal}
+            onGridImageClick={(index) => {
+              console.log(`Image ${index} clicked`);
+            }}
+            extraActions={
+              <div className="hidden md:flex items-center gap-3">
+                <HoverButton
+                  onClick={() => navigate("/records")}
+                  className="min-w-[240px] flex items-center justify-center gap-2 text-base"
+                >
+                  <FileText className="h-5 w-5" />
+                  View All Records
+                </HoverButton>
+                <HoverButton
+                  onClick={handleCameraQualityCheck}
+                  disabled={isCameraTesting}
+                  className="min-w-[240px] flex items-center justify-center gap-2 text-base"
+                >
+                  <Camera className="h-5 w-5" />
+                  {isCameraTesting ? "Testing Camera..." : "Camera Quality Check"}
+                </HoverButton>
+              </div>
+            }
+            customMainButton={
+              <HoverButton
+                onClick={handleStartAppraisal}
+                className="min-w-[240px] flex items-center justify-center gap-2 text-base"
+              >
+                <User className="h-5 w-5" />
+                Start Appraisal
+              </HoverButton>
+            }
+            topTextStyle={{
+              color: "var(--diced-hero-section-top-text)",
+              fontSize: "1.5rem"
+            }}
+            mainTextStyle={{
+              fontSize: "clamp(3rem, 8vw, 4.5rem)",
+              gradient: "linear-gradient(45deg, var(--diced-hero-section-main-gradient-from), var(--diced-hero-section-main-gradient-to))",
+              fontFamily: "'Playfair Display', 'Cinzel', serif",
+              fontStyle: "italic"
+            }}
+            subMainTextStyle={{
+              color: "var(--diced-hero-section-sub-text)",
+              fontSize: "1.25rem",
+              fontFamily: "'Poppins', sans-serif",
+              gradient: "linear-gradient(to right, hsl(158, 82%, 18%), hsl(158, 70%, 35%))"
+            }}
+            buttonStyle={{
+              backgroundColor: "var(--diced-hero-section-button-bg)",
+              color: "var(--diced-hero-section-button-fg)",
+              borderRadius: "2rem",
+              hoverColor: "var(--diced-hero-section-button-hover-bg)",
+              hoverForeground: "var(--diced-hero-section-button-hover-fg)",
+            }}
+            separatorColor="var(--diced-hero-section-separator)"
+            mobileBreakpoint={1000}
+            fontFamily="inherit"
           />
         </div>
 
-        {/* Hero Section */}
-        <main className="px-4 py-2">
-          <div className="[&_[data-diced-top-text]]:font-semibold [&_[data-diced-main-text]]:font-bold [&_[data-diced-main-text]]:leading-tight [&_[data-diced-sub-text]]:leading-relaxed [&_[data-diced-sub-text]]:font-normal lobster-subtext">
-            <DicedHeroSection
-              topText="AI-Powered Gold Appraisals"
-              mainText="Gold Guardian Pro"
-              subMainText="Fast, accurate gold jewelry appraisals powered by AI technology—optimized for banking workflows and compliance."
-              buttonText="Start Appraisal"
-              slides={goldAppraisalSlides}
-              onMainButtonClick={handleStartAppraisal}
-              onGridImageClick={(index) => {
-                console.log(`Image ${index} clicked`);
-              }}
-              extraActions={
-                <div className="hidden md:flex items-center gap-3">
-                  <HoverButton
-                    onClick={() => navigate("/records")}
-                    className="min-w-[240px] flex items-center justify-center gap-2 text-base"
-                  >
-                    <FileText className="h-5 w-5" />
-                    View All Records
-                  </HoverButton>
-                  <HoverButton
-                    onClick={handleCameraQualityCheck}
-                    disabled={isCameraTesting}
-                    className="min-w-[240px] flex items-center justify-center gap-2 text-base"
-                  >
-                    <Camera className="h-5 w-5" />
-                    {isCameraTesting ? "Testing Camera..." : "Camera Quality Check"}
-                  </HoverButton>
-                </div>
-              }
-              customMainButton={
-                <HoverButton
-                  onClick={handleStartAppraisal}
-                  className="min-w-[240px] flex items-center justify-center gap-2 text-base"
-                >
-                  <User className="h-5 w-5" />
-                  Start Appraisal
-                </HoverButton>
-              }
-              topTextStyle={{
-                color: "var(--diced-hero-section-top-text)",
-                fontSize: "1.5rem"
-              }}
-              mainTextStyle={{
-                fontSize: "clamp(3rem, 8vw, 4.5rem)",
-                gradient: "linear-gradient(45deg, var(--diced-hero-section-main-gradient-from), var(--diced-hero-section-main-gradient-to))",
-                fontFamily: "'Playfair Display', 'Cinzel', serif",
-                fontStyle: "italic"
-              }}
-              subMainTextStyle={{
-                color: "var(--diced-hero-section-sub-text)",
-                fontSize: "1.25rem",
-                fontFamily: "Playfair Display, serif",
-                gradient: "linear-gradient(to right, hsl(30, 15%, 20%), hsl(45, 90%, 40%))"
-              }}
-              buttonStyle={{
-                backgroundColor: "var(--diced-hero-section-button-bg)",
-                color: "var(--diced-hero-section-button-fg)",
-                borderRadius: "2rem",
-                hoverColor: "var(--diced-hero-section-button-hover-bg)",
-                hoverForeground: "var(--diced-hero-section-button-hover-fg)",
-              }}
-              separatorColor="var(--diced-hero-section-separator)"
-              mobileBreakpoint={1000}
-              fontFamily="inherit"
-            />
-          </div>
-
-          {/* Quick Action Buttons Row is now integrated into hero via extraActions */}
+        {/* Quick Action Buttons Row is now integrated into hero via extraActions */}
 
 
-        </main>
-      </div>
+      </main>
 
       {/* Camera Quality Test Dialog */}
       <Dialog open={showCameraTest} onOpenChange={handleCloseCameraTest}>
@@ -367,7 +365,7 @@ const Dashboard = () => {
           />
         </DialogContent>
       </Dialog>
-    </AuroraLayout>
+    </div >
   );
 };
 

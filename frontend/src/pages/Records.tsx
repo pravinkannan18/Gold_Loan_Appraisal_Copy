@@ -45,26 +45,26 @@ const Records = () => {
     try {
       // First try to get from localStorage
       const localAppraisals = [];
-      
+
       // Check for completed appraisals in localStorage
       const appraiserData = localStorage.getItem('currentAppraiser');
       const jewelleryItems = localStorage.getItem('jewelleryItems');
       const purityResults = localStorage.getItem('purityResults');
       const rbiCompliance = localStorage.getItem('rbiCompliance');
-      
+
       // Check for stored appraisal records
       const storedRecords = localStorage.getItem('appraisalRecords');
       if (storedRecords) {
         const records = JSON.parse(storedRecords);
         localAppraisals.push(...records);
       }
-      
+
       // If we have current session data, create a record from it
       if (appraiserData && jewelleryItems && purityResults) {
         const appraiser = JSON.parse(appraiserData);
         const items = JSON.parse(jewelleryItems);
         const purity = JSON.parse(purityResults);
-        
+
         const sessionRecord = {
           id: Date.now(),
           appraiser_name: appraiser.name || 'Unknown',
@@ -77,19 +77,19 @@ const Records = () => {
           purity_results: purity,
           rbi_compliance: rbiCompliance ? JSON.parse(rbiCompliance) : null
         };
-        
+
         // Check if this session record already exists
-        const existingRecord = localAppraisals.find(record => 
-          record.appraiser_name === sessionRecord.appraiser_name && 
+        const existingRecord = localAppraisals.find(record =>
+          record.appraiser_name === sessionRecord.appraiser_name &&
           record.total_items === sessionRecord.total_items &&
           Math.abs(new Date(record.created_at).getTime() - new Date(sessionRecord.created_at).getTime()) < 60000 // within 1 minute
         );
-        
+
         if (!existingRecord) {
           localAppraisals.unshift(sessionRecord); // Add to beginning
         }
       }
-      
+
       // Try API call as fallback
       try {
         const response = await apiService.getAllAppraisals();
@@ -104,9 +104,9 @@ const Records = () => {
       } catch (apiError) {
         console.log('API not available, using local data only');
       }
-      
+
       setAppraisals(localAppraisals);
-      
+
       if (localAppraisals.length === 0) {
         toast({
           title: "No Records",
@@ -128,7 +128,7 @@ const Records = () => {
   const viewAppraisal = async (appraisal: Appraisal) => {
     setSelectedAppraisal(appraisal);
     setIsDialogOpen(true);
-    
+
     // If this record has local data, use it
     if (appraisal.jewellery_items) {
       setJewelleryItems(appraisal.jewellery_items);
@@ -142,15 +142,15 @@ const Records = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b border-border bg-card">
+    <div className="min-h-screen bg-[hsl(48,50%,99%)]">
+      <header className="border-b border-[hsl(158,20%,88%)] bg-white shadow-sm">
         <div className="container mx-auto px-4 py-4 flex items-center gap-4">
           <Button variant="ghost" size="icon" onClick={() => navigate("/")}>
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
-            <h1 className="text-2xl font-bold text-primary">Appraisal Records</h1>
-            <p className="text-sm text-muted-foreground">View all appraisal history</p>
+            <h1 className="text-2xl font-bold text-[hsl(158,82%,18%)]">Appraisal Records</h1>
+            <p className="text-sm text-[hsl(158,40%,35%)]">View all appraisal history</p>
           </div>
         </div>
       </header>
@@ -218,7 +218,7 @@ const Records = () => {
           <DialogHeader>
             <DialogTitle>Appraisal Details</DialogTitle>
           </DialogHeader>
-          
+
           {selectedAppraisal && (
             <div className="space-y-6">
               <div className="grid md:grid-cols-2 gap-4">
@@ -245,8 +245,8 @@ const Records = () => {
                     <div key={item.id} className="border rounded-lg p-4">
                       <p className="text-sm font-medium mb-2">Item {item.item_number}</p>
                       {item.image_url && (
-                        <img 
-                          src={item.image_url} 
+                        <img
+                          src={item.image_url}
                           alt={`Item ${item.item_number}`}
                           className="w-full rounded-lg border"
                         />
