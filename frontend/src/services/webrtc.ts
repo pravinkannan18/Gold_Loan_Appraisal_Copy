@@ -87,11 +87,20 @@ export class WebRTCService {
         cameraId?: string
     ): Promise<WebRTCSession> {
         try {
-            // Get camera stream
+            // Get camera stream with optimized constraints for low latency
             const constraints: MediaStreamConstraints = {
                 video: cameraId
-                    ? { deviceId: { exact: cameraId }, width: 640, height: 480 }
-                    : { width: 640, height: 480 },
+                    ? { 
+                        deviceId: { exact: cameraId }, 
+                        width: { ideal: 640, max: 640 }, 
+                        height: { ideal: 480, max: 480 },
+                        frameRate: { ideal: 15, max: 20 }
+                      }
+                    : { 
+                        width: { ideal: 640, max: 640 }, 
+                        height: { ideal: 480, max: 480 },
+                        frameRate: { ideal: 15, max: 20 }
+                      },
                 audio: false
             };
 
@@ -103,10 +112,10 @@ export class WebRTCService {
                 this.videoElement = videoElement;
             }
 
-            // Create canvas for frame capture
+            // Create canvas for frame capture (smaller for faster processing)
             this.canvasElement = document.createElement('canvas');
-            this.canvasElement.width = 640;
-            this.canvasElement.height = 480;
+            this.canvasElement.width = 320;
+            this.canvasElement.height = 240;
 
             // Create session on backend
             const sessionResponse = await fetch(`${API_BASE}/api/webrtc/session/create`, {
@@ -222,11 +231,11 @@ export class WebRTCService {
                 const ctx = this.canvasElement.getContext('2d');
                 if (!ctx) return;
 
-                // Draw video frame to canvas
+                // Draw video frame to canvas (320x240 for faster processing)
                 ctx.drawImage(this.videoElement, 0, 0, this.canvasElement.width, this.canvasElement.height);
 
-                // Convert to base64
-                const frameData = this.canvasElement.toDataURL('image/jpeg', 0.7);
+                // Convert to base64 with lower quality for faster transfer
+                const frameData = this.canvasElement.toDataURL('image/jpeg', 0.5);
 
                 // Send to server
                 this.session.websocket.send(JSON.stringify({
@@ -236,7 +245,7 @@ export class WebRTCService {
             } catch (e) {
                 console.error('Frame capture error:', e);
             }
-        }, 100); // ~10 FPS for WebSocket mode
+        }, 66); // ~15 FPS for WebSocket mode (faster than before)
     }
 
     /**
@@ -247,10 +256,20 @@ export class WebRTCService {
         cameraId?: string
     ): Promise<WebRTCSession> {
         try {
+            // Optimized constraints for low latency
             const constraints: MediaStreamConstraints = {
                 video: cameraId
-                    ? { deviceId: { exact: cameraId }, width: 640, height: 480 }
-                    : { width: 640, height: 480 },
+                    ? { 
+                        deviceId: { exact: cameraId }, 
+                        width: { ideal: 640, max: 640 }, 
+                        height: { ideal: 480, max: 480 },
+                        frameRate: { ideal: 15, max: 20 }
+                      }
+                    : { 
+                        width: { ideal: 640, max: 640 }, 
+                        height: { ideal: 480, max: 480 },
+                        frameRate: { ideal: 15, max: 20 }
+                      },
                 audio: false
             };
 
@@ -309,7 +328,57 @@ export class WebRTCService {
                 console.log('🔄 Negotiation needed');
             };
 
+            // Variable to store session ID for data channel handler
+            let sessionId = '';
+
+            // Create data channel from CLIENT side (standard WebRTC pattern)
+            const statusChannel = pc.createDataChannel('status', { ordered: true });
+            console.log('📡 Created data channel from client');
+            
+            statusChannel.onopen = () => {
+                console.log('📡✅ Status data channel OPENED');
+            };
+            
+            statusChannel.onclose = () => {
+                console.log('📡❌ Status data channel closed');
+            };
+            
+            statusChannel.onmessage = (msgEvent) => {
+                console.log('📡📩 Data channel message received:', msgEvent.data?.substring(0, 100));
+                try {
+                    const data = JSON.parse(msgEvent.data);
+                    console.log('📡 Parsed data channel message:', JSON.stringify(data));
+                    
+                    if (data.type === 'status') {
+                        console.log('📡 Status update - calling onStatusChange:', !!this.onStatusChange);
+                        if (this.onStatusChange) {
+                            const statusUpdate = {
+                                session_id: sessionId || this.session?.sessionId || '',
+                                created_at: new Date().toISOString(),
+                                current_task: data.current_task,
+                                detection_status: {
+                                    rubbing_detected: data.rubbing_detected,
+                                    acid_detected: data.acid_detected,
+                                    gold_purity: data.gold_purity
+                                },
+                                connection_state: 'connected',
+                                mode: 'webrtc' as const
+                            };
+                            console.log('📡 Calling onStatusChange with:', JSON.stringify(statusUpdate));
+                            this.onStatusChange(statusUpdate);
+                        }
+                    }
+                } catch (e) {
+                    console.error('Failed to parse data channel message:', e, msgEvent.data);
+                }
+            };
+            
+            statusChannel.onerror = (error) => {
+                console.error('📡 Data channel error:', error);
+            };
+
             const offer = await pc.createOffer();
+
             await pc.setLocalDescription(offer);
             await this.waitForIceGathering(pc);
 
@@ -327,6 +396,10 @@ export class WebRTCService {
                 throw new Error(result.error || 'Failed to create session');
             }
 
+            // Set session ID for data channel handler
+            sessionId = result.session_id;
+            console.log('📡 Session ID set for data channel:', sessionId);
+
             await pc.setRemoteDescription(new RTCSessionDescription(result.answer));
 
             this.session = {
@@ -337,7 +410,11 @@ export class WebRTCService {
                 remoteStream
             };
 
-            this.startStatusPolling();
+            // CRITICAL: Do NOT poll status for WebRTC mode
+            // Status polling causes HTTP requests that interfere with the peer connection
+            // For WebRTC, status updates come via data channel
+            console.log('✅ WebRTC mode - status polling DISABLED, using data channel');
+            
             return this.session;
 
         } catch (error) {
@@ -366,16 +443,17 @@ export class WebRTCService {
         });
     }
 
-    private startStatusPolling() {
+    private startStatusPolling(interval: number = 500) {
         if (this.statusPollingInterval) {
             clearInterval(this.statusPollingInterval);
         }
+        console.log(`🔄 Starting status polling (interval: ${interval}ms)`);
         this.statusPollingInterval = window.setInterval(async () => {
             if (this.session && this.onStatusChange) {
                 const status = await this.getSessionStatus();
                 if (status) this.onStatusChange(status);
             }
-        }, 500);
+        }, interval);
     }
 
     async getSessionStatus(): Promise<SessionStatus | null> {

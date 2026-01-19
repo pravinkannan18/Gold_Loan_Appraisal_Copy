@@ -159,14 +159,19 @@ export function AppraiserDetails() {
 
       console.log('=== STORING IN LOCALSTORAGE ===');
       console.log('Data to store:', appraiserData);
+      console.log('Photo exists:', !!photo);
+      console.log('Photo length:', photo?.length);
+      console.log('Photo preview:', photo?.substring(0, 100));
 
       localStorage.setItem('currentAppraiser', JSON.stringify(appraiserData));
 
       // Verify it was stored
       const stored = localStorage.getItem('currentAppraiser');
+      const parsedStored = JSON.parse(stored || '{}');
       console.log('=== VERIFICATION ===');
       console.log('Stored data:', stored);
-      console.log('Parsed back:', JSON.parse(stored || '{}'));
+      console.log('Stored photo exists:', !!parsedStored.photo);
+      console.log('Stored photo length:', parsedStored.photo?.length);
 
       // Default success message - may be overridden by face registration
       let successMessage = 'Appraiser details saved!';

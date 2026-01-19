@@ -33,8 +33,12 @@ class InferenceWorker:
         # Rubbing motion tracking
         self.centroid_history = deque(maxlen=30)  # Track last 30 centroids
         self.rubbing_threshold = 15  # Minimum movement for rubbing detection
-        self.rubbing_confirm_frames = 10  # Frames needed to confirm rubbing
+        self.rubbing_confirm_frames = 5  # Frames needed to confirm rubbing (reduced for faster response)
         self.rubbing_frame_count = 0
+        
+        # Acid detection confirmation (prevent false positives)
+        self.acid_confirm_frames = 5  # Frames needed to confirm acid detection
+        self.acid_frame_count = 0
         
         # Detection parameters
         self.conf_threshold = 0.5
@@ -66,13 +70,21 @@ class InferenceWorker:
             "detections": []
         }
         
-        if current_task == "rubbing":
-            annotated, detection_result = self._process_rubbing(frame, annotated, detection_result)
-        elif current_task == "acid":
-            annotated, detection_result = self._process_acid(frame, annotated, detection_result)
-        elif current_task == "done":
-            # Just return frame with "Done" overlay
-            self._draw_done_overlay(annotated)
+        try:
+            if current_task == "rubbing":
+                annotated, detection_result = self._process_rubbing(frame, annotated, detection_result)
+            elif current_task == "acid":
+                annotated, detection_result = self._process_acid(frame, annotated, detection_result)
+            elif current_task == "done":
+                # Just return frame with "Done" overlay
+                self._draw_done_overlay(annotated)
+        except Exception as e:
+            logger.error(f"❌ Error in process_frame (task={current_task}): {e}")
+            import traceback
+            logger.error(f"❌ Traceback: {traceback.format_exc()}")
+            # Return frame with error message
+            cv2.putText(annotated, f"Error: {str(e)[:50]}", (10, 30), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
         
         return annotated, detection_result
     
@@ -200,6 +212,8 @@ class InferenceWorker:
                                                   conf=self.conf_threshold,
                                                   iou=self.iou_threshold)
         
+        acid_detected_this_frame = False
+        
         if acid_result is not None and acid_result.boxes is not None:
             for box in acid_result.boxes:
                 x1, y1, x2, y2 = map(int, box.xyxy[0].tolist())
@@ -222,7 +236,7 @@ class InferenceWorker:
                 cv2.putText(annotated, f"{class_name} {conf:.2f}", (x1, y1 - 10),
                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
                 
-                detection_result["acid_detected"] = True
+                acid_detected_this_frame = True
                 
                 # Parse purity from class name if available
                 if "22k" in class_name.lower():
@@ -231,6 +245,16 @@ class InferenceWorker:
                     detection_result["gold_purity"] = "18K"
                 elif "24k" in class_name.lower():
                     detection_result["gold_purity"] = "24K"
+        
+        # Confirm acid detection after consistent detection (prevent false positives)
+        if acid_detected_this_frame:
+            self.acid_frame_count += 1
+        else:
+            self.acid_frame_count = max(0, self.acid_frame_count - 1)
+        
+        # Only mark as detected after consistent detection
+        if self.acid_frame_count >= self.acid_confirm_frames:
+            detection_result["acid_detected"] = True
         
         # Draw acid status
         self._draw_acid_status(annotated, detection_result)
@@ -298,3 +322,4 @@ class InferenceWorker:
         """Reset internal state"""
         self.centroid_history.clear()
         self.rubbing_frame_count = 0
+        self.acid_frame_count = 0

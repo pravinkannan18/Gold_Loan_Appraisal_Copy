@@ -72,25 +72,62 @@ export function WebRTCPurityTesting() {
 
     // Handle session status updates
     const handleStatusChange = useCallback((status: SessionStatus) => {
+        console.log('📊 Status update:', status);
         setSessionStatus(status);
 
         // Update local state from session
         if (status.detection_status) {
-            if (status.detection_status.rubbing_detected && !rubbingCompleted) {
+            // Rubbing detected - backend auto-switches to acid task
+            if (status.detection_status.rubbing_detected) {
                 setRubbingCompleted(true);
-                showToast('✅ Rubbing Test Detected!', 'success');
             }
-            if (status.detection_status.acid_detected && !acidCompleted) {
+            
+            // Acid detected - backend auto-switches to done task
+            if (status.detection_status.acid_detected) {
                 setAcidCompleted(true);
-                showToast('✅ Acid Test Detected!', 'success');
             }
         }
 
+        // Update current task from backend (backend handles auto-switching)
+        console.log('📋 Task update:', status.current_task);
         setCurrentTask(status.current_task);
-    }, [rubbingCompleted, acidCompleted]);
+    }, []); // No dependencies - uses setters which are stable
+
+    // Auto-navigate to summary page when both tests are complete
+    useEffect(() => {
+        if (rubbingCompleted && acidCompleted && currentTask === 'done') {
+            console.log('🎉 Both tests complete! Navigating to summary...');
+            showToast('🎉 Purity testing complete! Proceeding to summary...', 'success');
+            
+            // Disconnect WebRTC and navigate after a short delay
+            setTimeout(() => {
+                webrtcService.disconnect();
+                navigate('/appraisal-summary');
+            }, 2000);
+        }
+    }, [rubbingCompleted, acidCompleted, currentTask, navigate]);
+
+    // Show toasts when tests complete
+    const [rubbingToastShown, setRubbingToastShown] = useState(false);
+    const [acidToastShown, setAcidToastShown] = useState(false);
+    
+    useEffect(() => {
+        if (rubbingCompleted && !rubbingToastShown) {
+            showToast('✅ Rubbing Test Complete! Starting Acid Test...', 'success');
+            setRubbingToastShown(true);
+        }
+    }, [rubbingCompleted, rubbingToastShown]);
+    
+    useEffect(() => {
+        if (acidCompleted && !acidToastShown) {
+            showToast('✅ Acid Test Complete! Analysis Done!', 'success');
+            setAcidToastShown(true);
+        }
+    }, [acidCompleted, acidToastShown]);
 
     // Handle annotated frames (WebSocket mode)
     const handleAnnotatedFrame = useCallback((frame: string) => {
+        console.log('🖼️ Received annotated frame, length:', frame?.length);
         setAnnotatedFrame(frame);
     }, []);
 
@@ -104,23 +141,29 @@ export function WebRTCPurityTesting() {
         const mode = webrtcService.getMode();
         if (mode) setConnectionMode(mode);
 
-        if (state === 'failed' || state === 'disconnected') {
+        if (state === 'failed' || state === 'disconnected' || state === 'closed') {
+            console.warn('⚠️ Connection lost or closed:', state);
             showToast('WebRTC connection lost', 'error');
         }
     }, []);
 
-    // Setup WebRTC callbacks
+    // Setup WebRTC callbacks - only once on mount
     useEffect(() => {
         webrtcService.setOnRemoteStream(handleRemoteStream);
         webrtcService.setOnAnnotatedFrame(handleAnnotatedFrame);
         webrtcService.setOnStatusChange(handleStatusChange);
         webrtcService.setOnConnectionStateChange(handleConnectionStateChange);
-
+        // NOTE: No cleanup disconnect here - it was causing premature disconnection
+        // Disconnect is handled explicitly by user action or auto-navigation
+    }, [handleRemoteStream, handleAnnotatedFrame, handleStatusChange, handleConnectionStateChange]);
+    
+    // Cleanup on unmount only
+    useEffect(() => {
         return () => {
-            // Cleanup on unmount
+            console.log('🧹 Component unmounting - disconnecting WebRTC');
             webrtcService.disconnect();
         };
-    }, [handleRemoteStream, handleStatusChange, handleConnectionStateChange]);
+    }, []); // Empty deps - only runs on unmount
 
     // Connect to WebRTC
     const connectWebRTC = async () => {
@@ -209,7 +252,7 @@ export function WebRTCPurityTesting() {
     };
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+        <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100">
             <StepIndicator currentStep={4} />
 
             <div className="w-full px-6 py-8">
@@ -241,10 +284,10 @@ export function WebRTCPurityTesting() {
 
                 {/* Camera Selection */}
                 {showCameraSelection && (
-                    <div className="bg-slate-800/80 backdrop-blur-sm rounded-2xl p-6 mb-6 border border-slate-700">
+                    <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 mb-6 border border-gray-200 shadow-sm">
                         <div className="flex items-center justify-between mb-4">
-                            <h3 className="text-xl font-bold text-white flex items-center">
-                                <ScanLine className="w-6 h-6 mr-2 text-emerald-400" />
+                            <h3 className="text-xl font-bold text-gray-800 flex items-center">
+                                <ScanLine className="w-6 h-6 mr-2 text-emerald-500" />
                                 Camera Selection
                             </h3>
                             <div className="flex gap-2">
@@ -262,10 +305,10 @@ export function WebRTCPurityTesting() {
                         </div>
 
                         {permission.status === 'denied' && (
-                            <div className="mb-4 p-4 bg-red-900/30 border border-red-500/30 rounded-xl">
+                            <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-xl">
                                 <div className="flex items-start gap-3">
-                                    <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0" />
-                                    <p className="text-red-200">Camera permission denied. Please enable in browser settings.</p>
+                                    <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0" />
+                                    <p className="text-red-600">Camera permission denied. Please enable in browser settings.</p>
                                 </div>
                             </div>
                         )}
@@ -286,19 +329,19 @@ export function WebRTCPurityTesting() {
                     {/* Video Streams */}
                     <div className="lg:col-span-2 space-y-4">
                         {/* Processed Video (from backend) */}
-                        <div className="bg-slate-800/80 backdrop-blur-sm rounded-2xl p-4 border border-slate-700">
+                        <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-4 border border-gray-200 shadow-sm">
                             <div className="flex items-center justify-between mb-3">
-                                <h4 className="text-lg font-bold text-white flex items-center">
-                                    <Video className="w-5 h-5 mr-2 text-emerald-400" />
+                                <h4 className="text-lg font-bold text-gray-800 flex items-center">
+                                    <Video className="w-5 h-5 mr-2 text-emerald-500" />
                                     AI-Annotated Stream
                                 </h4>
-                                <div className={`px-3 py-1 rounded-full text-sm font-medium ${isConnected ? 'bg-green-500/20 text-green-300' : 'bg-slate-600 text-slate-300'
+                                <div className={`px-3 py-1 rounded-full text-sm font-medium ${isConnected ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-500'
                                     }`}>
                                     {isConnected ? '🔴 LIVE' : 'Offline'}
                                 </div>
                             </div>
 
-                            <div className="relative aspect-video bg-slate-900 rounded-xl overflow-hidden border-2 border-emerald-500/30">
+                            <div className="relative aspect-video bg-gray-100 rounded-xl overflow-hidden border-2 border-emerald-200">
                                 {/* Remote video stream (always rendered for ref, visible in WebRTC mode) */}
                                 <video
                                     ref={remoteVideoRef}
@@ -317,10 +360,18 @@ export function WebRTCPurityTesting() {
                                     />
                                 )}
 
+                                {/* WebSocket mode: show processing indicator when no frame but connected */}
+                                {connectionMode === 'websocket' && !annotatedFrame && isConnected && (
+                                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-50">
+                                        <Loader2 className="w-12 h-12 text-emerald-500 animate-spin mb-4" />
+                                        <p className="text-gray-500 text-lg">Processing frames...</p>
+                                    </div>
+                                )}
+
                                 {!isConnected && (
-                                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-900/90">
-                                        <VideoOff className="w-16 h-16 text-slate-500 mb-4" />
-                                        <p className="text-slate-400 text-lg">Connect to start analysis</p>
+                                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-50">
+                                        <VideoOff className="w-16 h-16 text-gray-400 mb-4" />
+                                        <p className="text-gray-500 text-lg">Connect to start analysis</p>
                                     </div>
                                 )}
 
@@ -334,9 +385,9 @@ export function WebRTCPurityTesting() {
                         </div>
 
                         {/* Local Video Preview (small) */}
-                        <div className="bg-slate-800/60 rounded-xl p-3 border border-slate-700">
-                            <h5 className="text-sm font-medium text-slate-300 mb-2">Local Camera Preview</h5>
-                            <div className="relative aspect-video max-h-40 bg-slate-900 rounded-lg overflow-hidden">
+                        <div className="bg-white/60 rounded-xl p-3 border border-gray-200 shadow-sm">
+                            <h5 className="text-sm font-medium text-gray-600 mb-2">Local Camera Preview</h5>
+                            <div className="relative aspect-video max-h-40 bg-gray-100 rounded-lg overflow-hidden">
                                 <video
                                     ref={localVideoRef}
                                     autoPlay
@@ -351,8 +402,8 @@ export function WebRTCPurityTesting() {
                     {/* Controls Panel */}
                     <div className="space-y-4">
                         {/* Connection Controls */}
-                        <div className="bg-slate-800/80 backdrop-blur-sm rounded-2xl p-4 border border-slate-700">
-                            <h4 className="text-lg font-bold text-white mb-4">Connection</h4>
+                        <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-4 border border-gray-200 shadow-sm">
+                            <h4 className="text-lg font-bold text-gray-800 mb-4">Connection</h4>
 
                             <Button
                                 onClick={toggleConnection}
@@ -375,7 +426,7 @@ export function WebRTCPurityTesting() {
                                 <Button
                                     onClick={resetSession}
                                     variant="outline"
-                                    className="w-full mt-2 border-slate-600 text-slate-300"
+                                    className="w-full mt-2 border-gray-300 text-gray-600"
                                 >
                                     <RefreshCw className="w-4 h-4 mr-2" />
                                     Reset Session
@@ -385,8 +436,8 @@ export function WebRTCPurityTesting() {
 
                         {/* Task Switcher */}
                         {isConnected && (
-                            <div className="bg-slate-800/80 backdrop-blur-sm rounded-2xl p-4 border border-slate-700">
-                                <h4 className="text-lg font-bold text-white mb-4">Current Task</h4>
+                            <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-4 border border-gray-200 shadow-sm">
+                                <h4 className="text-lg font-bold text-gray-800 mb-4">Current Task</h4>
 
                                 <div className="grid grid-cols-3 gap-2">
                                     {(['rubbing', 'acid', 'done'] as const).map((task) => (
@@ -396,7 +447,7 @@ export function WebRTCPurityTesting() {
                                             variant={currentTask === task ? 'default' : 'outline'}
                                             className={`capitalize ${currentTask === task
                                                 ? 'bg-emerald-500 text-white'
-                                                : 'border-slate-600 text-slate-300'
+                                                : 'border-gray-300 text-gray-600'
                                                 }`}
                                         >
                                             {task}
@@ -407,28 +458,28 @@ export function WebRTCPurityTesting() {
                         )}
 
                         {/* Detection Status */}
-                        <div className="bg-slate-800/80 backdrop-blur-sm rounded-2xl p-4 border border-slate-700">
-                            <h4 className="text-lg font-bold text-white mb-4">Detection Status</h4>
+                        <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-4 border border-gray-200 shadow-sm">
+                            <h4 className="text-lg font-bold text-gray-800 mb-4">Detection Status</h4>
 
                             <div className="space-y-3">
-                                <div className="flex items-center justify-between p-3 bg-slate-900/50 rounded-lg">
-                                    <span className="text-slate-300">Rubbing Test</span>
-                                    <span className={`font-bold ${rubbingCompleted ? 'text-green-400' : 'text-amber-400'}`}>
+                                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                                    <span className="text-gray-600">Rubbing Test</span>
+                                    <span className={`font-bold ${rubbingCompleted ? 'text-green-500' : 'text-amber-500'}`}>
                                         {rubbingCompleted ? '✅ Detected' : '⏳ Pending'}
                                     </span>
                                 </div>
 
-                                <div className="flex items-center justify-between p-3 bg-slate-900/50 rounded-lg">
-                                    <span className="text-slate-300">Acid Test</span>
-                                    <span className={`font-bold ${acidCompleted ? 'text-green-400' : 'text-amber-400'}`}>
+                                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                                    <span className="text-gray-600">Acid Test</span>
+                                    <span className={`font-bold ${acidCompleted ? 'text-green-500' : 'text-amber-500'}`}>
                                         {acidCompleted ? '✅ Detected' : '⏳ Pending'}
                                     </span>
                                 </div>
 
                                 {sessionStatus?.detection_status?.gold_purity && (
-                                    <div className="flex items-center justify-between p-3 bg-amber-900/30 rounded-lg border border-amber-500/30">
-                                        <span className="text-amber-200">Gold Purity</span>
-                                        <span className="font-bold text-amber-400">
+                                    <div className="flex items-center justify-between p-3 bg-amber-50 rounded-lg border border-amber-200">
+                                        <span className="text-amber-700">Gold Purity</span>
+                                        <span className="font-bold text-amber-600">
                                             {sessionStatus.detection_status.gold_purity}
                                         </span>
                                     </div>
@@ -437,12 +488,21 @@ export function WebRTCPurityTesting() {
                         </div>
 
                         {/* Session Info */}
+                        {connectionMode === 'webrtc' && isConnected && (
+                            <div className="bg-blue-50 rounded-xl p-3 border border-blue-200 text-sm shadow-sm">
+                                <div className="text-blue-700 font-medium mb-1">🎥 WebRTC Mode</div>
+                                <div className="text-blue-600 text-xs">
+                                    Watch the video stream for task status. Auto-switches: Rubbing → Acid → Done
+                                </div>
+                            </div>
+                        )}
+                        
                         {sessionStatus && (
-                            <div className="bg-slate-800/60 rounded-xl p-3 border border-slate-700 text-sm">
-                                <div className="text-slate-400 space-y-1">
-                                    <div>Session: <span className="text-slate-200">{sessionStatus.session_id}</span></div>
-                                    <div>Task: <span className="text-emerald-400">{sessionStatus.current_task}</span></div>
-                                    <div>State: <span className="text-slate-200">{sessionStatus.connection_state}</span></div>
+                            <div className="bg-white/60 rounded-xl p-3 border border-gray-200 text-sm shadow-sm">
+                                <div className="text-gray-500 space-y-1">
+                                    <div>Session: <span className="text-gray-700">{sessionStatus.session_id}</span></div>
+                                    <div>Task: <span className="text-emerald-600">{sessionStatus.current_task}</span></div>
+                                    <div>State: <span className="text-gray-700">{sessionStatus.connection_state}</span></div>
                                 </div>
                             </div>
                         )}
@@ -451,7 +511,7 @@ export function WebRTCPurityTesting() {
 
                 {/* Navigation */}
                 <div className="flex justify-between mt-8">
-                    <Button onClick={() => navigate('/rbi-compliance')} variant="outline" className="border-slate-600 text-slate-300">
+                    <Button onClick={() => navigate('/rbi-compliance')} variant="outline" className="border-gray-300 text-gray-600">
                         <ArrowLeft className="w-4 h-4 mr-2" />
                         Back
                     </Button>

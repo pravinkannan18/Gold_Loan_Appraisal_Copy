@@ -44,6 +44,8 @@ class WebRTCSession:
     # For WebSocket fallback mode
     websocket: Any = None
     is_websocket_mode: bool = False
+    # For WebRTC data channel status updates
+    status_channel: Any = None
 
 
 class WebRTCManager:
@@ -125,6 +127,34 @@ class WebRTCManager:
                 peer_connection=pc,
                 is_websocket_mode=False
             )
+            
+            # Listen for data channel from CLIENT (standard WebRTC pattern)
+            @pc.on("datachannel")
+            def on_datachannel(channel):
+                logger.info(f"📡 Received data channel from client: {channel.label}")
+                session.status_channel = channel
+                
+                @channel.on("open")
+                def on_channel_open():
+                    logger.info("📡✅ Status data channel OPENED - ready to send")
+                    # Send initial status when channel opens
+                    try:
+                        import json
+                        initial_status = json.dumps({
+                            "type": "status",
+                            "current_task": session.current_task,
+                            "rubbing_detected": session.detection_status["rubbing_detected"],
+                            "acid_detected": session.detection_status["acid_detected"],
+                            "gold_purity": session.detection_status.get("gold_purity")
+                        })
+                        channel.send(initial_status)
+                        logger.info("📡 Sent initial status via data channel")
+                    except Exception as e:
+                        logger.error(f"❌ Failed to send initial status: {e}")
+                
+                @channel.on("message")
+                def on_message(message):
+                    logger.info(f"📡 Received message from client: {message}")
             
             # Store the transform track to be created when we receive the client track
             transform_track = None

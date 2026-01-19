@@ -176,8 +176,18 @@ async def websocket_stream(websocket: WebSocket, session_id: str):
                         # Update session state
                         if detection_result.get("rubbing_detected"):
                             session.detection_status["rubbing_detected"] = True
-                        if detection_result.get("acid_detected"):
+                            # Auto-switch to acid task when rubbing is detected
+                            if session.current_task == "rubbing":
+                                logger.info("✅ Rubbing confirmed! Auto-switching to acid task")
+                                session.current_task = "acid"
+                                # Reset acid detection for fresh start
+                                # Don't clear inference worker state to avoid race conditions
+                                session.detection_status["acid_detected"] = False
+                        if detection_result.get("acid_detected") and session.current_task == "acid":
+                            # Only mark acid detected if we're in acid task
                             session.detection_status["acid_detected"] = True
+                            # Auto-switch to done when acid is detected
+                            session.current_task = "done"
                         if detection_result.get("gold_purity"):
                             session.detection_status["gold_purity"] = detection_result["gold_purity"]
                         
@@ -205,6 +215,7 @@ async def websocket_stream(websocket: WebSocket, session_id: str):
                 elif action == "reset":
                     webrtc_manager.reset_session(session_id)
                     inference_worker.reset()
+                    session.current_task = "rubbing"  # Also reset task to rubbing
                     await websocket.send_json({
                         "type": "control",
                         "message": "Session reset",
@@ -214,6 +225,14 @@ async def websocket_stream(websocket: WebSocket, session_id: str):
                 elif action == "set_task":
                     task = msg.get("task", "rubbing")
                     if task in ("rubbing", "acid", "done"):
+                        # Reset inference state when switching tasks
+                        if task != session.current_task:
+                            inference_worker.reset()
+                            # Reset detection status for the new task
+                            if task == "rubbing":
+                                session.detection_status["rubbing_detected"] = False
+                            elif task == "acid":
+                                session.detection_status["acid_detected"] = False
                         session.current_task = task
                         await websocket.send_json({
                             "type": "control",

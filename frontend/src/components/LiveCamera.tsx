@@ -105,15 +105,21 @@ const LiveCamera = forwardRef<LiveCameraRef, LiveCameraProps>((props, ref) => {
     return () => stopCamera();
   }, [currentStepKey, selectedDeviceId]);  // Re-run if step or device changes
 
-  const startCamera = async (deviceId?: string) => {
+  const startCamera = async (deviceId?: string, retryCount: number = 0) => {
     try {
       setError(null);
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
         throw new Error("Camera API not supported in this browser");
       }
+      
+      // Stop any existing stream first
       if (streamRef.current) {
         streamRef.current.getTracks().forEach(t => t.stop());
+        streamRef.current = null;
+        // Wait a bit for the camera to be released
+        await new Promise(resolve => setTimeout(resolve, 300));
       }
+      
       const constraints: MediaStreamConstraints = {
         video: deviceId ? { deviceId: { exact: deviceId } } : true,
       };
@@ -139,7 +145,17 @@ const LiveCamera = forwardRef<LiveCameraRef, LiveCameraProps>((props, ref) => {
       } else if (err.name === 'NotFoundError') {
         message = "No camera found. Please connect a camera and try again.";
       } else if (err.name === 'NotReadableError') {
-        message = "Camera is already in use by another application.";
+        message = "Camera is already in use. Please close other apps using this camera (Teams, Zoom, etc.) or try a different camera.";
+        // Retry with a different camera if available
+        if (retryCount < 2 && devices.length > 1) {
+          const currentIndex = devices.findIndex(d => d.deviceId === deviceId);
+          const nextIndex = (currentIndex + 1) % devices.length;
+          const nextDevice = devices[nextIndex];
+          console.log(`Camera busy, trying next camera: ${nextDevice.label}`);
+          toast({ title: "Camera Busy", description: `Trying ${nextDevice.label || 'another camera'}...` });
+          setTimeout(() => startCamera(nextDevice.deviceId, retryCount + 1), 500);
+          return;
+        }
       } else if (err.name === 'OverconstrainedError') {
         message = "Selected camera doesn't meet the requirements. Trying default camera...";
         // Retry with default camera

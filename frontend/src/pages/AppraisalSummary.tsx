@@ -135,7 +135,31 @@ export function AppraisalSummary() {
         return;
       }
 
-      setAppraiser(JSON.parse(appraiserStr));
+      const parsedAppraiser = JSON.parse(appraiserStr);
+      console.log('=== APPRAISER DATA DEBUG ===');
+      console.log('Appraiser object keys:', Object.keys(parsedAppraiser));
+      console.log('Has photo property:', 'photo' in parsedAppraiser);
+      console.log('Photo value type:', typeof parsedAppraiser.photo);
+      console.log('Photo value length:', parsedAppraiser.photo?.length);
+      console.log('Photo starts with:', parsedAppraiser.photo?.substring(0, 100));
+      console.log('Photo is truthy:', !!parsedAppraiser.photo);
+      console.log('Photo is valid base64:', parsedAppraiser.photo?.startsWith('data:image'));
+      console.log('=== END APPRAISER DEBUG ===');
+      
+      // Check if photo is missing or invalid
+      if (!parsedAppraiser.photo || !parsedAppraiser.photo.startsWith('data:image')) {
+        console.warn('⚠️ Appraiser photo missing or invalid');
+        // Try to get from alternative storage
+        const altPhoto = localStorage.getItem('newAppraiserPhoto') || localStorage.getItem('appraiserPhoto');
+        if (altPhoto && altPhoto.startsWith('data:image')) {
+          console.log('✅ Found photo in alternative storage');
+          parsedAppraiser.photo = altPhoto;
+        } else {
+          console.warn('❌ No valid photo found in any storage location');
+        }
+      }
+      
+      setAppraiser(parsedAppraiser);
       setCustomerFront(frontImage);
       setCustomerSide(sideImage || '');
 
@@ -411,11 +435,30 @@ export function AppraisalSummary() {
                 </div>
                 <div>
                   <p className="text-sm text-blue-700 font-semibold mb-3">Photo</p>
-                  <img
-                    src={appraiser.photo}
-                    alt="Appraiser"
-                    className="w-36 h-36 object-cover rounded-2xl border-4 border-blue-400 shadow-lg"
-                  />
+                  {appraiser.photo ? (
+                    <img
+                      src={appraiser.photo}
+                      alt="Appraiser"
+                      className="w-36 h-36 object-cover rounded-2xl border-4 border-blue-400 shadow-lg"
+                      onError={(e) => {
+                        console.error('Failed to load appraiser photo');
+                        console.error('Photo data length:', appraiser.photo?.length);
+                        console.error('Photo data preview:', appraiser.photo?.substring(0, 100));
+                        e.currentTarget.style.display = 'none';
+                        e.currentTarget.parentElement?.insertAdjacentHTML(
+                          'beforeend',
+                          '<div class="w-36 h-36 bg-gray-200 rounded-2xl border-4 border-blue-400 flex items-center justify-center text-gray-500 text-sm">Photo unavailable</div>'
+                        );
+                      }}
+                      onLoad={() => {
+                        console.log('Successfully loaded appraiser photo');
+                      }}
+                    />
+                  ) : (
+                    <div className="w-36 h-36 bg-gray-200 rounded-2xl border-4 border-blue-400 flex items-center justify-center text-gray-500 text-sm">
+                      No photo
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

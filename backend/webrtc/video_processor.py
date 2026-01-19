@@ -56,6 +56,9 @@ class VideoTransformTrack(MediaStreamTrack):
         self.last_fps_time = time.time()
         self.fps = 0.0
         
+        # State transition queue to prevent race conditions
+        self._pending_task_switch = None
+        
         logger.info("🎬 VideoTransformTrack initialized")
     
     async def recv(self) -> VideoFrame:
@@ -66,8 +69,27 @@ class VideoTransformTrack(MediaStreamTrack):
         """
         try:
             # Receive frame from client (this is sequential)
-            frame = await self.track.recv()
+            try:
+                frame = await self.track.recv()
+            except Exception as recv_error:
+                # Handle MediaStreamError or track ending
+                if "MediaStreamError" in str(type(recv_error).__name__):
+                    logger.warning("⚠️ Media stream ended - track closed by client")
+                    raise  # Re-raise to close connection cleanly
+                else:
+                    logger.error(f"❌ Error receiving frame: {recv_error}")
+                    raise
+                    
             self.frame_count += 1
+            
+            # Apply any pending task switches at a safe point (start of frame processing)
+            if self._pending_task_switch:
+                logger.info(f"🔄 Applying queued task switch: {self.session.current_task} → {self._pending_task_switch}")
+                self.session.current_task = self._pending_task_switch
+                self.session.detection_status["acid_detected"] = False
+                self._pending_task_switch = None
+                # Send status update via data channel
+                self._send_status_update()
             
             # Simple frame skipping to reduce latency
             # Only process every 2nd frame for AI analysis to maintain 15fps inference on a 30fps stream
@@ -106,6 +128,10 @@ class VideoTransformTrack(MediaStreamTrack):
             # Update session state based on detection
             self._update_session_state(detection_result)
             
+            # Periodically send status updates (every 30 frames / ~2 seconds)
+            if self.frame_count % 30 == 0:
+                self._send_status_update()
+            
             # Add FPS and process time overlay
             self._update_fps()
             self._draw_overlay(annotated_img, self.last_process_time)
@@ -118,32 +144,63 @@ class VideoTransformTrack(MediaStreamTrack):
             return new_frame
             
         except Exception as e:
+            import traceback
             logger.error(f"❌ Error processing frame: {e}")
-            # Return original frame on error (try to recv again)
-            return await self.track.recv()
+            logger.error(f"❌ Error type: {type(e).__name__}")
+            logger.error(f"❌ Traceback: {traceback.format_exc()}")
+            logger.error(f"❌ Current task: {self.session.current_task}")
+            logger.error(f"❌ Frame count: {self.frame_count}")
+            # Return original frame on error
+            try:
+                img = frame.to_ndarray(format="bgr24")
+                new_frame = VideoFrame.from_ndarray(img, format="bgr24")
+                new_frame.pts = frame.pts
+                new_frame.time_base = frame.time_base
+                return new_frame
+            except:
+                # If even that fails, try to get next frame
+                return await self.track.recv()
     
     def _update_session_state(self, detection_result: Dict):
         """Update session state based on detection results"""
         if not detection_result:
             return
             
-        # Update detection status
-        if detection_result.get("rubbing_detected"):
+        state_changed = False
+            
+        # Update detection status - only update for current task
+        if detection_result.get("rubbing_detected") and self.session.current_task == "rubbing":
+            if not self.session.detection_status["rubbing_detected"]:
+                state_changed = True
             self.session.detection_status["rubbing_detected"] = True
             
-        if detection_result.get("acid_detected"):
+        # Only update acid_detected when we're actually in acid task
+        if detection_result.get("acid_detected") and self.session.current_task == "acid":
+            if not self.session.detection_status["acid_detected"]:
+                state_changed = True
             self.session.detection_status["acid_detected"] = True
             
         if detection_result.get("gold_purity"):
             self.session.detection_status["gold_purity"] = detection_result["gold_purity"]
         
-        # Auto-transition tasks
+        # Auto-transition: rubbing -> acid when rubbing detected
         if self.session.current_task == "rubbing" and self.session.detection_status["rubbing_detected"]:
-            # Stay in rubbing for now - manual transition via API
-            pass
+            # Queue the task switch instead of applying immediately
+            if self._pending_task_switch is None:
+                self._pending_task_switch = "acid"
+                logger.info("✅ Rubbing confirmed! Queuing switch to acid task")
+                state_changed = True
             
+        # Auto-transition: acid -> done when acid detected
         if self.session.current_task == "acid" and self.session.detection_status["acid_detected"]:
-            self.session.current_task = "done"
+            if self._pending_task_switch is None:
+                self._pending_task_switch = "done"
+                logger.info("✅ Acid test complete! Queuing switch to done")
+                state_changed = True
+        
+        # Send status update whenever state changes
+        if state_changed:
+            self._send_status_update()
     
     def _update_fps(self):
         """Calculate and update FPS based on received frames"""
@@ -181,3 +238,25 @@ class VideoTransformTrack(MediaStreamTrack):
         
         if status.get("acid_detected"):
             cv2.putText(img, "✓ Acid OK", (20, status_y + 25), font, 0.6, (0, 255, 0), 2)
+    
+    def _send_status_update(self):
+        """Send status update via data channel"""
+        if hasattr(self.session, 'status_channel') and self.session.status_channel:
+            try:
+                # Check if data channel is open
+                if self.session.status_channel.readyState != 'open':
+                    logger.debug(f"⏳ Data channel not open yet (state: {self.session.status_channel.readyState})")
+                    return
+                    
+                import json
+                status_data = json.dumps({
+                    "type": "status",
+                    "current_task": self.session.current_task,
+                    "rubbing_detected": self.session.detection_status["rubbing_detected"],
+                    "acid_detected": self.session.detection_status["acid_detected"],
+                    "gold_purity": self.session.detection_status.get("gold_purity")
+                })
+                self.session.status_channel.send(status_data)
+                logger.info(f"📡 Sent status update: task={self.session.current_task}")
+            except Exception as e:
+                logger.warning(f"⚠️ Failed to send status via data channel: {e}")
