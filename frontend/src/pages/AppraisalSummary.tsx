@@ -610,9 +610,16 @@ export function AppraisalSummary() {
 
             {rbiData.overallImages && rbiData.overallImages.length > 0 && (
               <div className="space-y-2">
-                <p className="text-sm font-semibold">Overall Collection Image</p>
-                <div className="h-48 rounded-lg overflow-hidden border bg-muted">
-                  <img src={rbiData.overallImages[0].image} alt="Overall" className="w-full h-full object-cover" />
+                <p className="text-sm font-semibold">Overall Collection Images ({rbiData.overallImages.length})</p>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  {rbiData.overallImages.map((img, index) => (
+                    <div key={img.id || index} className="space-y-1">
+                      <div className="h-32 rounded-lg overflow-hidden border bg-muted">
+                        <img src={img.image} alt={`Overall ${index + 1}`} className="w-full h-full object-cover" />
+                      </div>
+                      <p className="text-[10px] text-center text-muted-foreground">Image {index + 1}</p>
+                    </div>
+                  ))}
                 </div>
               </div>
             )}

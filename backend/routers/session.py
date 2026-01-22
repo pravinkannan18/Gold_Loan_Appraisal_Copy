@@ -154,10 +154,15 @@ async def save_rbi_compliance(session_id: str, data: RBIComplianceData):
             # Use individual items
             jewellery_items = [item.dict() for item in data.captured_items]
         elif data.overall_images:
-            # Create items from overall image
-            overall_image = data.overall_images[0].image if data.overall_images else ""
+            # Create items from overall images - distribute images across items
+            # If multiple overall images exist, assign each to corresponding items
+            num_overall_images = len(data.overall_images)
             jewellery_items = [
-                {"itemNumber": i + 1, "image": overall_image, "description": f"Item {i + 1} (from overall)"}
+                {
+                    "itemNumber": i + 1, 
+                    "image": data.overall_images[i % num_overall_images].image,  # Cycle through images
+                    "description": f"Item {i + 1} (from overall image {(i % num_overall_images) + 1})"
+                }
                 for i in range(data.total_items)
             ]
         
