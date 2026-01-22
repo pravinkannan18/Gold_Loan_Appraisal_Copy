@@ -6,6 +6,10 @@ export interface AppraiserData {
   id: string;
   image: string;
   timestamp: string;
+  bank?: string;
+  branch?: string;
+  email?: string;
+  phone?: string;
 }
 
 export interface AppraiserResponse {
@@ -67,7 +71,7 @@ class ApiService {
   // Get appraiser by ID
   async getAppraiser(appraiserId: string) {
     const response = await fetch(`${this.baseUrl}/api/appraiser/${appraiserId}`);
-    
+
     if (!response.ok) {
       const error = await response.json();
       throw new Error(error.detail || 'Failed to get appraiser');
@@ -95,7 +99,7 @@ class ApiService {
   // Get all appraisals
   async getAllAppraisals(skip: number = 0, limit: number = 100) {
     const response = await fetch(`${this.baseUrl}/api/appraisals?skip=${skip}&limit=${limit}`);
-    
+
     if (!response.ok) {
       const error = await response.json();
       throw new Error(error.detail || 'Failed to get appraisals');
@@ -107,7 +111,7 @@ class ApiService {
   // Get statistics
   async getStatistics() {
     const response = await fetch(`${this.baseUrl}/api/statistics`);
-    
+
     if (!response.ok) {
       const error = await response.json();
       throw new Error(error.detail || 'Failed to get statistics');
@@ -121,7 +125,7 @@ class ApiService {
     const response = await fetch(`${this.baseUrl}/api/camera/check`, {
       method: 'POST',
     });
-    
+
     if (!response.ok) {
       const error = await response.json();
       throw new Error(error.detail || 'Failed to check camera');

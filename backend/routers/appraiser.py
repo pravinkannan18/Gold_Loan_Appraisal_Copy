@@ -12,6 +12,10 @@ class AppraiserDetails(BaseModel):
     id: str
     image: str
     timestamp: str
+    bank: Optional[str] = None
+    branch: Optional[str] = None
+    email: Optional[str] = None
+    phone: Optional[str] = None
 
 # Dependency injection (will be set in main.py)
 db = None
@@ -27,7 +31,11 @@ async def create_appraiser(appraiser: AppraiserDetails):
         name=appraiser.name,
         appraiser_id=appraiser.id,
         image_data=appraiser.image,
-        timestamp=appraiser.timestamp
+        timestamp=appraiser.timestamp,
+        bank=appraiser.bank,
+        branch=appraiser.branch,
+        email=appraiser.email,
+        phone=appraiser.phone
     )
     return {"success": True, "id": appraiser_db_id, "message": "Appraiser saved"}
 

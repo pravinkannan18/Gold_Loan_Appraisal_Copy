@@ -98,7 +98,7 @@ class InferenceWorker:
         elif current_task == "acid":
             self.stage = "ACID"
         elif current_task == "done":
-            self.stage = "COMPLETED"
+            self.stage = "PLETED"
         
         # AUTO-RESET: If we just switched TO rubbing (from acid/done) = new item
         # This clears stale detection from previous item

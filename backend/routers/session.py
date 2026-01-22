@@ -16,6 +16,10 @@ class AppraiserData(BaseModel):
     image: str  # base64 image
     timestamp: str
     photo: Optional[str] = None  # Alternative field for photo
+    bank: Optional[str] = None
+    branch: Optional[str] = None
+    email: Optional[str] = None
+    phone: Optional[str] = None
 
 class CustomerImages(BaseModel):
     front_image: str  # base64 image

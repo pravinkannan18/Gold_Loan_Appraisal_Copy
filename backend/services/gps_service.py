@@ -24,7 +24,7 @@ class GPSService:
 
     def __init__(self):
         # Configuration
-        self.GPS_PORT = os.getenv("GPS_COM_PORT", "COM7")
+        self.GPS_PORT = os.getenv("GPS_COM_PORT", "COM14")
         self.BAUDRATE = 115200
         self.TIMEOUT = 5  # seconds to wait for GPS data
         self.GEOAPIFY_KEY = os.getenv("GEOAPIFY_API_KEY", "")

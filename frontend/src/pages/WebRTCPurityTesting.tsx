@@ -1,9 +1,13 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, Gem, Play, Square, AlertCircle, ScanLine, RefreshCw, Wifi, WifiOff, Video, VideoOff, Loader2 } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Gem, Play, Square, AlertCircle, ScanLine, RefreshCw, Wifi, WifiOff, Video, VideoOff, Loader2, CheckCircle } from 'lucide-react';
 import { StepIndicator } from '../components/journey/StepIndicator';
 import { showToast } from '../lib/utils';
 import { Button } from '../components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
+import { StatusBadge } from '../components/ui/status-badge';
+import { ModernDashboardLayout } from '../components/layouts/ModernDashboardLayout';
+import { cn } from '../lib/utils';
 import { PageCameraSelector } from '../components/ui/page-camera-selector';
 import { useCameraDetection } from '../hooks/useCameraDetection';
 import { webrtcService, type SessionStatus } from '../services/webrtc';
@@ -474,464 +478,296 @@ export function WebRTCPurityTesting() {
     };
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100">
-            <StepIndicator currentStep={4} />
+        <ModernDashboardLayout
+            title="Purity Testing"
+            showSidebar
+            headerContent={<StepIndicator currentStep={4} />}
+        >
+            <div className="max-w-7xl mx-auto space-y-6 pb-20">
 
-            <div className="w-full px-6 py-8">
-                {/* Header */}
-                <div className="bg-gradient-to-r from-emerald-600 via-emerald-700 to-teal-700 rounded-2xl p-6 mb-6 shadow-2xl">
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-4">
-                            <div className="p-3 bg-white/20 rounded-xl backdrop-blur-sm">
-                                <Gem className="w-8 h-8 text-white" />
-                            </div>
-                            <div>
-                                <h1 className="text-2xl font-bold text-white">Purity Testing</h1>
-                                <p className="text-emerald-100">Real-time AI-powered gold analysis</p>
-                                {totalItemCount > 0 && (
-                                    <div className="mt-2 flex items-center gap-2">
-                                        <div className="px-3 py-1 bg-white/20 rounded-lg backdrop-blur-sm border border-white/30">
-                                            <span className="text-sm font-bold text-white">
-                                                Item {currentItemIndex + 1} of {totalItemCount}
-                                            </span>
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-
-                        {/* Connection Status */}
-                        <div className="flex items-center gap-4">
-                            <div className={`flex items-center gap-2 px-4 py-2 rounded-lg ${isConnected
-                                ? 'bg-green-500/20 text-green-200 border border-green-400/30'
-                                : 'bg-red-500/20 text-red-200 border border-red-400/30'
-                                }`}>
-                                {isConnected ? <Wifi className="w-5 h-5" /> : <WifiOff className="w-5 h-5" />}
-                                <span className="font-medium">{connectionState}</span>
-                            </div>
-                        </div>
+                {/* Header Section */}
+                <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                    <div>
+                        <h2 className="text-2xl font-bold font-poppins flex items-center gap-2 text-primary">
+                            <Gem className="w-6 h-6 text-secondary" />
+                            AI-Powered Analysis
+                        </h2>
+                        <p className="text-muted-foreground">Real-time gold purity verification using computer vision</p>
                     </div>
+
+                    {totalItemCount > 0 && (
+                        <StatusBadge variant="default" className="text-sm px-4 py-2 bg-card border shadow-sm">
+                            <span className="font-bold text-primary mr-1">
+                                Item {currentItemIndex + 1}
+                            </span>
+                            of {totalItemCount}
+                        </StatusBadge>
+                    )}
                 </div>
 
                 {/* Camera Selection */}
                 {showCameraSelection && (
-                    <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 mb-6 border border-gray-200 shadow-sm">
-                        <div className="flex items-center justify-between mb-4">
-                            <h3 className="text-xl font-bold text-gray-800 flex items-center">
-                                <ScanLine className="w-6 h-6 mr-2 text-emerald-500" />
-                                Camera Selection
-                            </h3>
+                    <Card className="border-warning/50 bg-warning/5">
+                        <CardHeader className="flex flex-row items-center justify-between pb-2">
+                            <div className="flex items-center gap-2 text-warning-foreground">
+                                <ScanLine className="w-5 h-5" />
+                                <CardTitle className="text-lg">Camera Setup</CardTitle>
+                            </div>
                             <div className="flex gap-2">
                                 <Button onClick={enumerateDevices} disabled={cameraLoading} variant="outline" size="sm">
-                                    {cameraLoading ? (
-                                        <><RefreshCw className="w-4 h-4 mr-2 animate-spin" /> Scanning...</>
-                                    ) : (
-                                        <><RefreshCw className="w-4 h-4 mr-2" /> Refresh</>
-                                    )}
+                                    {cameraLoading ? <RefreshCw className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2" />}
+                                    Refresh
                                 </Button>
-                                <Button onClick={() => setShowCameraSelection(false)} variant="outline" size="sm">
+                                <Button onClick={() => setShowCameraSelection(false)} variant="ghost" size="sm">
                                     ✕ Close
                                 </Button>
                             </div>
-                        </div>
-
-                        {permission.status === 'denied' && (
-                            <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-xl">
-                                <div className="flex items-start gap-3">
-                                    <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0" />
-                                    <p className="text-red-600">Camera permission denied. Please enable in browser settings.</p>
+                        </CardHeader>
+                        <CardContent>
+                            {permission.status === 'denied' && (
+                                <div className="mb-4 p-3 bg-destructive/10 border border-destructive/20 rounded-lg flex items-center gap-2 text-destructive">
+                                    <AlertCircle className="w-5 h-5" />
+                                    <span className="font-semibold">Camera permission denied</span>
                                 </div>
+                            )}
+                            <div className="flex justify-center">
+                                <PageCameraSelector
+                                    context="purity-testing"
+                                    label="Select Analysis Camera"
+                                    onCameraSelected={(camera) => setSelectedCameraId(camera?.deviceId || '')}
+                                    className="w-full max-w-md"
+                                />
                             </div>
-                        )}
-
-                        <div className="flex justify-center">
-                            <PageCameraSelector
-                                context="purity-testing"
-                                label="📹 Select Camera for Analysis"
-                                onCameraSelected={(camera) => setSelectedCameraId(camera?.deviceId || '')}
-                                className="w-full max-w-md"
-                            />
-                        </div>
-                    </div>
+                        </CardContent>
+                    </Card>
                 )}
 
-                {/* Main Content */}
+                {/* Main Content Grid */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    {/* Video Streams */}
-                    <div className="lg:col-span-2 space-y-4">
-                        {/* Processed Video (from backend) */}
-                        <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-4 border border-gray-200 shadow-sm">
-                            <div className="flex items-center justify-between mb-3">
-                                <h4 className="text-lg font-bold text-gray-800 flex items-center">
-                                    <Video className="w-5 h-5 mr-2 text-emerald-500" />
-                                    AI-Annotated Stream
-                                </h4>
-                                <div className={`px-3 py-1 rounded-full text-sm font-medium ${isConnected ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-500'
-                                    }`}>
-                                    {isConnected ? '🔴 LIVE' : 'Offline'}
-                                </div>
-                            </div>
 
-                            <div className="relative aspect-video bg-gray-100 rounded-xl overflow-hidden border-2 border-emerald-200">
-                                {/* Remote video stream (always rendered for ref, visible in WebRTC mode) */}
+                    {/* LEFT COLUMN: Video Streams (2/3 width) */}
+                    <div className="lg:col-span-2 space-y-6">
+                        <Card className="overflow-hidden border-2 border-primary/20 shadow-lg">
+                            <CardHeader className="py-3 bg-muted/40 border-b flex flex-row items-center justify-between">
+                                <CardTitle className="text-base flex items-center gap-2">
+                                    <Video className="w-4 h-4 text-primary" />
+                                    Live Analysis Stream
+                                </CardTitle>
+                                <StatusBadge variant={isConnected ? "live" : "default"}>
+                                    {isConnected ? "LIVE" : "OFFLINE"}
+                                </StatusBadge>
+                            </CardHeader>
+                            <div className="relative aspect-video bg-black/90">
+                                {/* Remote Stream */}
                                 <video
                                     ref={remoteVideoRef}
                                     autoPlay
                                     playsInline
                                     muted
-                                    className={`w-full h-full object-cover ${connectionMode !== 'webrtc' ? 'hidden' : ''}`}
+                                    className={cn("w-full h-full object-contain", connectionMode !== 'webrtc' && "hidden")}
                                 />
-
-                                {/* WebSocket mode: show annotated frame as image */}
+                                {/* WebSocket Frame */}
                                 {connectionMode === 'websocket' && annotatedFrame && (
-                                    <img
-                                        src={annotatedFrame}
-                                        alt="AI Analysis"
-                                        className="w-full h-full object-cover"
-                                    />
+                                    <img src={annotatedFrame} alt="Analysis" className="w-full h-full object-contain" />
                                 )}
-
-                                {/* WebSocket mode: show processing indicator when no frame but connected */}
+                                {/* Loading/Empty States */}
                                 {connectionMode === 'websocket' && !annotatedFrame && isConnected && (
-                                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-50">
-                                        <Loader2 className="w-12 h-12 text-emerald-500 animate-spin mb-4" />
-                                        <p className="text-gray-500 text-lg">Processing frames...</p>
+                                    <div className="absolute inset-0 flex flex-col items-center justify-center text-secondary">
+                                        <Loader2 className="w-12 h-12 animate-spin mb-2" />
+                                        <p>Processing...</p>
                                     </div>
                                 )}
-
                                 {!isConnected && (
-                                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-50">
-                                        <VideoOff className="w-16 h-16 text-gray-400 mb-4" />
-                                        <p className="text-gray-500 text-lg">Connect to start analysis</p>
+                                    <div className="absolute inset-0 flex flex-col items-center justify-center text-muted-foreground/50">
+                                        <VideoOff className="w-16 h-16 mb-4" />
+                                        <p>Connect to start analysis</p>
                                     </div>
                                 )}
-
-                                {/* Mode indicator */}
+                                {/* Mode Indicator */}
                                 {isConnected && connectionMode && (
-                                    <div className="absolute top-2 left-2 px-2 py-1 bg-black/50 rounded text-xs text-white">
-                                        {connectionMode.toUpperCase()} mode
+                                    <div className="absolute top-2 left-2 px-2 py-1 bg-black/60 rounded text-[10px] text-white font-mono uppercase border border-white/10">
+                                        {connectionMode}
                                     </div>
                                 )}
                             </div>
-                        </div>
+                        </Card>
 
-                        {/* Local Video Preview (small) */}
-                        <div className="bg-white/60 rounded-xl p-3 border border-gray-200 shadow-sm">
-                            <h5 className="text-sm font-medium text-gray-600 mb-2">Local Camera Preview</h5>
-                            <div className="relative aspect-video max-h-40 bg-gray-100 rounded-lg overflow-hidden">
-                                <video
-                                    ref={localVideoRef}
-                                    autoPlay
-                                    playsInline
-                                    muted
-                                    className="w-full h-full object-cover"
-                                />
+                        {/* Local Preview (Small) */}
+                        <Card className="w-full max-w-[240px]">
+                            <CardHeader className="py-2 px-3 border-b">
+                                <CardTitle className="text-xs text-muted-foreground">Local Preview</CardTitle>
+                            </CardHeader>
+                            <div className="aspect-video bg-black/10">
+                                <video ref={localVideoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
                             </div>
-                        </div>
+                        </Card>
                     </div>
 
-                    {/* Controls Panel */}
-                    <div className="space-y-4">
-                        {/* Connection Controls */}
-                        <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-4 border border-gray-200 shadow-sm">
-                            <h4 className="text-lg font-bold text-gray-800 mb-4">Connection</h4>
+                    {/* RIGHT COLUMN: Controls & Status (1/3 width) */}
+                    <div className="space-y-6">
 
-                            <Button
-                                onClick={toggleConnection}
-                                disabled={!selectedCameraId || isConnecting}
-                                className={`w-full py-6 text-lg font-bold ${isConnected
-                                    ? 'bg-red-500 hover:bg-red-600'
-                                    : 'bg-emerald-500 hover:bg-emerald-600'
-                                    }`}
-                            >
-                                {isConnecting ? (
-                                    <><RefreshCw className="w-5 h-5 mr-2 animate-spin" /> Connecting...</>
-                                ) : isConnected ? (
-                                    <><Square className="w-5 h-5 mr-2" /> Disconnect</>
-                                ) : (
-                                    <><Play className="w-5 h-5 mr-2" /> Connect & Analyze</>
-                                )}
-                            </Button>
-
-                            {isConnected && (
+                        {/* Connection Card */}
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Control Panel</CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-3">
                                 <Button
-                                    onClick={resetSession}
-                                    variant="outline"
-                                    className="w-full mt-2 border-gray-300 text-gray-600"
+                                    onClick={toggleConnection}
+                                    disabled={!selectedCameraId || isConnecting}
+                                    size="lg"
+                                    className={cn(
+                                        "w-full font-bold shadow-md transition-all",
+                                        isConnected ? "bg-destructive hover:bg-destructive/90" : "bg-success hover:bg-success/90 text-white"
+                                    )}
                                 >
-                                    <RefreshCw className="w-4 h-4 mr-2" />
-                                    Reset Session
+                                    {isConnecting ? (
+                                        <><RefreshCw className="w-4 h-4 mr-2 animate-spin" /> Connecting...</>
+                                    ) : isConnected ? (
+                                        <><Square className="w-4 h-4 mr-2" /> Disconnect Analysis</>
+                                    ) : (
+                                        <><Play className="w-4 h-4 mr-2" /> Start Analysis</>
+                                    )}
                                 </Button>
-                            )}
-                        </div>
 
-                        {/* Task Switcher */}
-                        {isConnected && (
-                            <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-4 border border-gray-200 shadow-sm">
-                                <h4 className="text-lg font-bold text-gray-800 mb-4">Current Task</h4>
+                                {isConnected && (
+                                    <Button variant="outline" onClick={resetSession} className="w-full">
+                                        <RefreshCw className="w-4 h-4 mr-2" /> Reset Session
+                                    </Button>
+                                )}
+                            </CardContent>
+                        </Card>
 
-                                <div className="grid grid-cols-3 gap-2">
-                                    {(['rubbing', 'acid', 'done'] as const).map((task) => (
-                                        <Button
-                                            key={task}
-                                            onClick={() => switchTask(task)}
-                                            variant={currentTask === task ? 'default' : 'outline'}
-                                            className={`capitalize ${currentTask === task
-                                                ? 'bg-emerald-500 text-white'
-                                                : 'border-gray-300 text-gray-600'
-                                                }`}
-                                        >
-                                            {task}
-                                        </Button>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Detection Status */}
-                        <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-4 border border-gray-200 shadow-sm">
-                            <h4 className="text-lg font-bold text-gray-800 mb-4">Detection Status</h4>
-
-                            <div className="space-y-3">
-                                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                                    <span className="text-gray-600">Rubbing Test</span>
-                                    <span className={`font-bold ${rubbingCompleted ? 'text-green-500' : 'text-amber-500'}`}>
-                                        {rubbingCompleted ? '✅ Detected' : '⏳ Pending'}
-                                    </span>
-                                </div>
-
-                                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                                    <span className="text-gray-600">Acid Test</span>
-                                    <span className={`font-bold ${acidCompleted ? 'text-green-500' : 'text-amber-500'}`}>
-                                        {acidCompleted ? '✅ Detected' : '⏳ Pending'}
-                                    </span>
-                                </div>
-
-                                {sessionStatus?.detection_status?.gold_purity && (
-                                    <div className="flex items-center justify-between p-3 bg-amber-50 rounded-lg border border-amber-200">
-                                        <span className="text-amber-700">Gold Purity</span>
-                                        <span className="font-bold text-amber-600">
+                        {/* Current Item Status */}
+                        <Card className="border-primary/20 shadow-md">
+                            <CardHeader className="pb-2">
+                                <CardTitle className="text-lg flex items-center justify-between">
+                                    <span>Detection Status</span>
+                                    {sessionStatus?.detection_status?.gold_purity && (
+                                        <span className="text-sm px-2 py-1 rounded bg-secondary text-secondary-foreground font-bold">
                                             {sessionStatus.detection_status.gold_purity}
                                         </span>
+                                    )}
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                                {/* Rubbing Status */}
+                                <div className={cn(
+                                    "flex items-center justify-between p-3 rounded-xl border transition-all",
+                                    rubbingCompleted ? "bg-success/10 border-success/30" :
+                                        (currentTask === 'rubbing') ? "bg-secondary/10 border-secondary animate-pulse-glow" : "bg-muted border-transparent"
+                                )}>
+                                    <div className="flex items-center gap-3">
+                                        <div className={cn(
+                                            "w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm",
+                                            rubbingCompleted ? "bg-success text-white" : "bg-muted-foreground/30 text-muted-foreground"
+                                        )}>
+                                            {rubbingCompleted ? "✓" : "1"}
+                                        </div>
+                                        <div>
+                                            <p className="font-semibold text-sm">Rubbing Test</p>
+                                            <p className="text-xs text-muted-foreground">Gold streak verification</p>
+                                        </div>
                                     </div>
-                                )}
-                            </div>
-                        </div>
+                                    <StatusBadge variant={rubbingCompleted ? "success" : "default"} size="sm">
+                                        {rubbingCompleted ? "Verified" : "Pending"}
+                                    </StatusBadge>
+                                </div>
 
-                        {/* Multi-Item Test Sections */}
+                                {/* Acid Status */}
+                                <div className={cn(
+                                    "flex items-center justify-between p-3 rounded-xl border transition-all",
+                                    acidCompleted ? "bg-success/10 border-success/30" :
+                                        (currentTask === 'acid') ? "bg-secondary/10 border-secondary animate-pulse-glow" : "bg-muted border-transparent"
+                                )}>
+                                    <div className="flex items-center gap-3">
+                                        <div className={cn(
+                                            "w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm",
+                                            acidCompleted ? "bg-success text-white" : "bg-muted-foreground/30 text-muted-foreground"
+                                        )}>
+                                            {acidCompleted ? "✓" : "2"}
+                                        </div>
+                                        <div>
+                                            <p className="font-semibold text-sm">Acid Test</p>
+                                            <p className="text-xs text-muted-foreground">Purity confirmation</p>
+                                        </div>
+                                    </div>
+                                    <StatusBadge variant={acidCompleted ? "success" : "default"} size="sm">
+                                        {acidCompleted ? "Verified" : "Pending"}
+                                    </StatusBadge>
+                                </div>
+                            </CardContent>
+                        </Card>
+
+                        {/* Multi-Item Progress */}
                         {totalItemCount > 0 && (
-                            <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-4 border border-gray-200 shadow-sm">
-                                <div className="flex items-center justify-between mb-4">
-                                    <h4 className="text-lg font-bold text-gray-800">Purity Tests</h4>
-                                    <div className="text-sm font-medium text-gray-500">
-                                        {itemTestResults.filter(i => i.rubbingCompleted && i.acidCompleted).length} / {totalItemCount} Complete
+                            <Card>
+                                <CardHeader className="pb-2">
+                                    <CardTitle className="text-sm text-muted-foreground uppercase tracking-wider">Overall Progress</CardTitle>
+                                    <div className="flex items-center justify-between mt-1">
+                                        <span className="text-2xl font-bold font-poppins text-primary">
+                                            {itemTestResults.filter(i => i.rubbingCompleted && i.acidCompleted).length}
+                                            <span className="text-base text-muted-foreground font-normal ml-1">/ {totalItemCount} Items</span>
+                                        </span>
                                     </div>
-                                </div>
-
-                                {/* Progress Bar */}
-                                <div className="w-full bg-gray-200 rounded-full h-2 mb-4">
-                                    <div
-                                        className="bg-gradient-to-r from-emerald-500 to-teal-500 h-2 rounded-full transition-all duration-500"
-                                        style={{ width: `${(itemTestResults.filter(i => i.rubbingCompleted && i.acidCompleted).length / totalItemCount) * 100}%` }}
-                                    />
-                                </div>
-
-                                <div className="space-y-4 max-h-96 overflow-y-auto pr-1">
+                                </CardHeader>
+                                <CardContent className="max-h-[300px] overflow-y-auto pr-1 space-y-2">
                                     {itemTestResults.map((item, index) => {
-                                        const isCurrentItem = index === currentItemIndex;
                                         const isComplete = item.rubbingCompleted && item.acidCompleted;
-                                        const isPending = index > currentItemIndex;
-
-                                        // For current item, use live state
-                                        const showRubbingComplete = isCurrentItem ? rubbingCompleted : item.rubbingCompleted;
-                                        const showAcidComplete = isCurrentItem ? acidCompleted : item.acidCompleted;
-
+                                        const isActive = index === currentItemIndex;
                                         return (
-                                            <div
-                                                key={item.itemNumber}
-                                                className={`rounded-xl border-2 overflow-hidden transition-all duration-300 ${isCurrentItem
-                                                    ? 'border-emerald-400 shadow-lg shadow-emerald-500/20 ring-2 ring-emerald-300/50'
-                                                    : isComplete
-                                                        ? 'border-green-300 bg-green-50/50'
-                                                        : 'border-gray-200 bg-gray-50/50 opacity-60'
-                                                    }`}
-                                            >
-                                                {/* Test Header */}
-                                                <div className={`px-4 py-3 flex items-center justify-between ${isCurrentItem
-                                                    ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white'
-                                                    : isComplete
-                                                        ? 'bg-green-100 text-green-800'
-                                                        : 'bg-gray-100 text-gray-500'
-                                                    }`}>
-                                                    <div className="flex items-center gap-3">
-                                                        <span className={`text-lg font-bold ${isCurrentItem ? 'text-white' : ''}`}>
-                                                            Test {item.itemNumber}
-                                                        </span>
-                                                        {isCurrentItem && (
-                                                            <span className="px-2 py-0.5 bg-white/20 rounded-full text-xs font-medium animate-pulse">
-                                                                🔴 Testing Now
-                                                            </span>
-                                                        )}
-                                                        {isComplete && !isCurrentItem && (
-                                                            <span className="text-green-600">✅</span>
-                                                        )}
-                                                    </div>
-                                                    {isPending && (
-                                                        <span className="text-xs text-gray-400">Pending</span>
-                                                    )}
-                                                </div>
-
-                                                {/* Test Details - Rubbing & Acid */}
-                                                <div className="p-4 space-y-3">
-                                                    {/* Rubbing Test */}
-                                                    <div className={`flex items-center justify-between p-3 rounded-lg transition-all ${showRubbingComplete
-                                                        ? 'bg-green-100 border border-green-300'
-                                                        : isCurrentItem && currentTask === 'rubbing'
-                                                            ? 'bg-amber-50 border-2 border-amber-400 shadow-md'
-                                                            : 'bg-gray-100 border border-gray-200'
-                                                        }`}>
-                                                        <div className="flex items-center gap-3">
-                                                            <div className={`w-8 h-8 rounded-full flex items-center justify-center ${showRubbingComplete
-                                                                ? 'bg-green-500 text-white'
-                                                                : isCurrentItem && currentTask === 'rubbing'
-                                                                    ? 'bg-amber-500 text-white animate-pulse'
-                                                                    : 'bg-gray-300 text-gray-500'
-                                                                }`}>
-                                                                {showRubbingComplete ? '✓' : '1'}
-                                                            </div>
-                                                            <div>
-                                                                <div className="font-semibold text-gray-800">Rubbing Test</div>
-                                                                <div className="text-xs text-gray-500">Gold streak verification</div>
-                                                            </div>
-                                                        </div>
-                                                        <span className={`font-bold text-sm ${showRubbingComplete
-                                                            ? 'text-green-600'
-                                                            : isCurrentItem && currentTask === 'rubbing'
-                                                                ? 'text-amber-600'
-                                                                : 'text-gray-400'
-                                                            }`}>
-                                                            {showRubbingComplete ? '✅ Complete' : isCurrentItem && currentTask === 'rubbing' ? '⏳ In Progress' : '○ Pending'}
-                                                        </span>
-                                                    </div>
-
-                                                    {/* Acid Test */}
-                                                    <div className={`flex items-center justify-between p-3 rounded-lg transition-all ${showAcidComplete
-                                                        ? 'bg-green-100 border border-green-300'
-                                                        : isCurrentItem && currentTask === 'acid'
-                                                            ? 'bg-amber-50 border-2 border-amber-400 shadow-md'
-                                                            : 'bg-gray-100 border border-gray-200'
-                                                        }`}>
-                                                        <div className="flex items-center gap-3">
-                                                            <div className={`w-8 h-8 rounded-full flex items-center justify-center ${showAcidComplete
-                                                                ? 'bg-green-500 text-white'
-                                                                : isCurrentItem && currentTask === 'acid'
-                                                                    ? 'bg-amber-500 text-white animate-pulse'
-                                                                    : 'bg-gray-300 text-gray-500'
-                                                                }`}>
-                                                                {showAcidComplete ? '✓' : '2'}
-                                                            </div>
-                                                            <div>
-                                                                <div className="font-semibold text-gray-800">Acid Test</div>
-                                                                <div className="text-xs text-gray-500">Purity confirmation</div>
-                                                            </div>
-                                                        </div>
-                                                        <span className={`font-bold text-sm ${showAcidComplete
-                                                            ? 'text-green-600'
-                                                            : isCurrentItem && currentTask === 'acid'
-                                                                ? 'text-amber-600'
-                                                                : 'text-gray-400'
-                                                            }`}>
-                                                            {showAcidComplete ? '✅ Complete' : isCurrentItem && currentTask === 'acid' ? '⏳ In Progress' : '○ Pending'}
-                                                        </span>
-                                                    </div>
-                                                </div>
+                                            <div key={item.itemNumber} className={cn(
+                                                "flex items-center justify-between p-2 rounded-lg border text-sm",
+                                                isActive ? "border-primary/50 bg-primary/5 shadow-sm" :
+                                                    isComplete ? "border-success/30 bg-success/5" : "border-border bg-muted/20"
+                                            )}>
+                                                <span className={cn("font-medium", isActive && "text-primary")}>Item {item.itemNumber}</span>
+                                                {isComplete ? (
+                                                    <CheckCircle className="w-4 h-4 text-success" />
+                                                ) : isActive ? (
+                                                    <div className="h-2 w-2 rounded-full bg-secondary animate-pulse" />
+                                                ) : (
+                                                    <span className="text-xs text-muted-foreground">To Do</span>
+                                                )}
                                             </div>
                                         );
                                     })}
-                                </div>
-
-                                {/* All Tests Complete Message */}
-                                {itemTestResults.every(i => i.rubbingCompleted && i.acidCompleted) && (
-                                    <div className="mt-4 p-4 bg-green-100 border-2 border-green-400 rounded-xl text-center">
-                                        <div className="text-2xl mb-2">🎉</div>
-                                        <div className="font-bold text-green-800">All Purity Tests Complete!</div>
-                                        <div className="text-sm text-green-600">You can now proceed to the summary.</div>
-                                    </div>
-                                )}
-                            </div>
+                                </CardContent>
+                            </Card>
                         )}
 
-
-                        {/* Session Info */}
-                        {connectionMode === 'webrtc' && isConnected && (
-                            <div className="bg-blue-50 rounded-xl p-3 border border-blue-200 text-sm shadow-sm">
-                                <div className="text-blue-700 font-medium mb-1">🎥 WebRTC Mode</div>
-                                <div className="text-blue-600 text-xs">
-                                    Watch the video stream for task status. Auto-switches: Rubbing → Acid → Done
-                                </div>
-                            </div>
-                        )}
-
-                        {sessionStatus && (
-                            <div className="bg-white/60 rounded-xl p-3 border border-gray-200 text-sm shadow-sm">
-                                <div className="text-gray-500 space-y-1">
-                                    <div>Session: <span className="text-gray-700">{sessionStatus.session_id}</span></div>
-                                    <div>Task: <span className="text-emerald-600">{sessionStatus.current_task}</span></div>
-                                    <div>State: <span className="text-gray-700">{sessionStatus.connection_state}</span></div>
-                                </div>
-                            </div>
-                        )}
                     </div>
                 </div>
 
-                {/* Navigation */}
-                <div className="flex justify-between items-center mt-8">
-                    <Button onClick={() => navigate('/rbi-compliance')} variant="outline" className="border-gray-300 text-gray-600">
-                        <ArrowLeft className="w-4 h-4 mr-2" />
-                        Back
-                    </Button>
+                {/* Footer Navigation */}
+                <div className="fixed bottom-0 left-0 right-0 p-4 bg-background/80 backdrop-blur-md border-t z-40">
+                    <div className="max-w-7xl mx-auto flex items-center justify-between">
+                        <Button variant="ghost" onClick={() => navigate('/rbi-compliance')}>
+                            <ArrowLeft className="w-4 h-4 mr-2" /> Back
+                        </Button>
 
-                    {/* Show progress indicator in the middle */}
-                    {totalItemCount > 0 && (
-                        <div className="text-center">
-                            <div className="text-sm text-gray-500">
-                                Testing Progress
-                            </div>
-                            <div className="text-lg font-bold text-emerald-600">
-                                {itemTestResults.filter(i => i.rubbingCompleted && i.acidCompleted).length} / {totalItemCount} Complete
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Next Button - enabled only when ALL items are complete */}
-                    {(() => {
-                        const allComplete = totalItemCount > 0 && itemTestResults.every(i => i.rubbingCompleted && i.acidCompleted);
-                        return (
-                            <Button
-                                onClick={handleNext}
-                                disabled={!allComplete}
-                                className={`px-8 py-6 text-lg font-bold transition-all duration-300 ${allComplete
-                                    ? 'bg-gradient-to-r from-emerald-500 via-emerald-600 to-teal-600 hover:from-emerald-600 hover:via-emerald-700 hover:to-teal-700 text-white shadow-lg shadow-emerald-500/30 animate-pulse'
-                                    : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                                    }`}
-                            >
-                                {allComplete ? (
-                                    <>
-                                        ✅ Complete - Go to Summary
-                                        <ArrowRight className="w-5 h-5 ml-2" />
-                                    </>
-                                ) : (
-                                    <>
-                                        Complete All Tests to Continue
-                                        <ArrowRight className="w-5 h-5 ml-2" />
-                                    </>
-                                )}
-                            </Button>
-                        );
-                    })()}
+                        {(() => {
+                            const allComplete = totalItemCount > 0 && itemTestResults.every(i => i.rubbingCompleted && i.acidCompleted);
+                            return (
+                                <Button
+                                    size="lg"
+                                    onClick={handleNext}
+                                    disabled={!allComplete}
+                                    className={cn("min-w-[200px]", allComplete && "animate-pulse shadow-lg shadow-success/20 bg-success text-white hover:bg-success/90")}
+                                >
+                                    {allComplete ? (
+                                        <>Complete & Continue <ArrowRight className="w-4 h-4 ml-2" /></>
+                                    ) : (
+                                        <>{itemTestResults.filter(i => i.rubbingCompleted && i.acidCompleted).length} / {totalItemCount} Completed</>
+                                    )}
+                                </Button>
+                            );
+                        })()}
+                    </div>
                 </div>
+
             </div>
-        </div>
+        </ModernDashboardLayout>
     );
 }
 

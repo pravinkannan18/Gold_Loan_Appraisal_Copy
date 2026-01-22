@@ -12,8 +12,14 @@ import {
   MapPin,
   Globe,
   Loader2,
-  AlertCircle
+  AlertCircle,
+  Clock
 } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { StatusBadge } from '@/components/ui/status-badge';
+import { ModernDashboardLayout } from '@/components/layouts/ModernDashboardLayout';
+import { cn } from '@/lib/utils';
 import { StepIndicator } from '../components/journey/StepIndicator';
 import { formatTimestamp, clearAppraisalData, showToast } from '../lib/utils';
 import QRCode from 'qrcode';
@@ -438,10 +444,10 @@ export function AppraisalSummary() {
   // Show loading state while fetching data
   if (pageLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-[hsl(48,50%,99%)] via-[hsl(158,30%,97%)] to-[hsl(320,100%,98%)] flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-16 h-16 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-lg font-semibold text-gray-700">Loading appraisal data...</p>
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center space-y-4">
+          <Loader2 className="w-12 h-12 text-primary animate-spin mx-auto" />
+          <p className="text-lg font-semibold text-muted-foreground">Loading appraisal data...</p>
         </div>
       </div>
     );
@@ -450,20 +456,24 @@ export function AppraisalSummary() {
   // Show error state if loading failed
   if (loadError) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-[hsl(48,50%,99%)] via-[hsl(158,30%,97%)] to-[hsl(320,100%,98%)] flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <AlertCircle className="w-8 h-8 text-red-600" />
-          </div>
-          <p className="text-lg font-semibold text-red-700 mb-2">Failed to load data</p>
-          <p className="text-gray-600 mb-4">{loadError}</p>
-          <button
-            onClick={() => navigate('/appraiser-details')}
-            className="px-6 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700"
-          >
-            Start New Appraisal
-          </button>
-        </div>
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Card className="w-full max-w-md border-destructive/50 bg-destructive/5">
+          <CardContent className="pt-6 text-center space-y-4">
+            <div className="w-16 h-16 bg-destructive/10 rounded-full flex items-center justify-center mx-auto">
+              <AlertCircle className="w-8 h-8 text-destructive" />
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold text-destructive">Failed to load data</h3>
+              <p className="text-muted-foreground mt-2">{loadError}</p>
+            </div>
+            <Button
+              onClick={() => navigate('/appraiser-details')}
+              variant="destructive"
+            >
+              Start New Appraisal
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     );
   }
@@ -473,328 +483,294 @@ export function AppraisalSummary() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[hsl(48,50%,99%)] via-[hsl(158,30%,97%)] to-[hsl(320,100%,98%)]">
-      <StepIndicator currentStep={5} />
+    <ModernDashboardLayout
+      title="Appraisal Summary"
+      showSidebar
+      headerContent={<StepIndicator currentStep={5} />}
+    >
+      <div className="max-w-7xl mx-auto space-y-6 pb-20">
 
-      <div className="max-w-7xl mx-auto px-4 py-8">
-        <div className="bg-white/90 backdrop-blur-sm rounded-[30px] shadow-2xl border border-[hsl(158,20%,88%)] overflow-hidden">
-          <div className="bg-gradient-to-r from-[hsl(158,82%,18%)] via-[hsl(158,75%,22%)] to-[hsl(158,70%,25%)] p-8">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="p-4 bg-white/20 rounded-2xl backdrop-blur-sm">
-                  <CheckCircle className="w-10 h-10 text-white" />
-                </div>
-                <div>
-                  <h1 className="text-3xl font-bold text-white tracking-wide">Appraisal Summary</h1>
-                  <p className="text-[hsl(158,60%,85%)] text-lg font-medium">Final Review - Step 5 of 5</p>
-                </div>
-              </div>
-              <button
-                onClick={handleExportPDF}
-                className="px-8 py-4 bg-white/20 hover:bg-white/30 text-white rounded-2xl font-bold transition-all duration-300 flex items-center gap-3 shadow-lg hover:shadow-xl backdrop-blur-sm"
-              >
-                <Download className="w-6 h-6" />
-                Export PDF
-              </button>
-            </div>
+        {/* Header Actions */}
+        <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+          <div>
+            <h2 className="text-2xl font-bold font-poppins text-primary">Final Review</h2>
+            <p className="text-muted-foreground">Review and finalize the appraisal documentation</p>
           </div>
+          <Button onClick={handleExportPDF} className="gap-2 shadow-md">
+            <Download className="w-4 h-4" />
+            Export PDF Report
+          </Button>
+        </div>
 
-          <div className="p-10 space-y-10">
-            <div className="bg-gradient-to-r from-[hsl(158,30%,95%)] to-[hsl(158,25%,92%)] rounded-[30px] p-8 border-2 border-[hsl(158,25%,85%)] shadow-lg">
-              <div className="flex items-center gap-4 mb-6">
-                <User className="w-8 h-8 text-[hsl(158,82%,18%)]" />
-                <h2 className="text-2xl font-bold text-[hsl(158,82%,18%)] tracking-wide">Appraiser Information</h2>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Appraiser Info */}
+          <Card>
+            <CardHeader className="flex flex-row items-center gap-4 pb-2">
+              <div className="p-2 bg-primary/10 rounded-lg">
+                <User className="w-6 h-6 text-primary" />
               </div>
-              <div className="grid md:grid-cols-2 gap-8">
+              <div>
+                <CardTitle className="text-lg">Appraiser Information</CardTitle>
+                <CardDescription>Verified appraiser details</CardDescription>
+              </div>
+            </CardHeader>
+            <CardContent className="grid grid-cols-2 gap-4">
+              <div className="space-y-4">
                 <div>
-                  <p className="text-sm text-gray-600 mb-1">Name</p>
-                  <p className="text-lg font-semibold text-gray-900">{appraiser.name}</p>
-                  <p className="text-sm text-gray-600 mt-2 mb-1">ID</p>
-                  <p className="text-sm font-mono text-gray-700">{appraiser.appraiser_id}</p>
+                  <p className="text-xs text-muted-foreground uppercase tracking-wider">Name</p>
+                  <p className="font-semibold text-lg">{appraiser.name}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-blue-700 font-semibold mb-3">Photo</p>
-                  {appraiser.photo ? (
-                    <img
-                      src={appraiser.photo}
-                      alt="Appraiser"
-                      className="w-36 h-36 object-cover rounded-2xl border-4 border-blue-400 shadow-lg"
-                      onError={(e) => {
-                        console.error('Failed to load appraiser photo');
-                        console.error('Photo data length:', appraiser.photo?.length);
-                        console.error('Photo data preview:', appraiser.photo?.substring(0, 100));
-                        e.currentTarget.style.display = 'none';
-                        e.currentTarget.parentElement?.insertAdjacentHTML(
-                          'beforeend',
-                          '<div class="w-36 h-36 bg-gray-200 rounded-2xl border-4 border-blue-400 flex items-center justify-center text-gray-500 text-sm">Photo unavailable</div>'
-                        );
-                      }}
-                      onLoad={() => {
-                        console.log('Successfully loaded appraiser photo');
-                      }}
-                    />
-                  ) : (
-                    <div className="w-36 h-36 bg-gray-200 rounded-2xl border-4 border-blue-400 flex items-center justify-center text-gray-500 text-sm">
-                      No photo
+                  <p className="text-xs text-muted-foreground uppercase tracking-wider">ID</p>
+                  <p className="font-mono text-sm bg-muted px-2 py-1 rounded inline-block">{appraiser.appraiser_id}</p>
+                </div>
+              </div>
+              <div className="flex justify-center md:justify-end">
+                {appraiser.photo ? (
+                  <img src={appraiser.photo} alt="Appraiser" className="w-24 h-24 object-cover rounded-xl border-2 border-primary/20 shadow-sm" />
+                ) : (
+                  <div className="w-24 h-24 bg-muted rounded-xl flex items-center justify-center text-muted-foreground text-xs">No Photo</div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Customer Images */}
+          <Card>
+            <CardHeader className="flex flex-row items-center gap-4 pb-2">
+              <div className="p-2 bg-secondary/10 rounded-lg">
+                <User className="w-6 h-6 text-secondary-foreground" />
+              </div>
+              <div>
+                <CardTitle className="text-lg">Customer Documentation</CardTitle>
+                <CardDescription>Identity verification images</CardDescription>
+              </div>
+            </CardHeader>
+            <CardContent className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <p className="text-xs text-muted-foreground font-medium">Front View</p>
+                <div className="aspect-[4/3] rounded-lg overflow-hidden border bg-muted">
+                  <img src={customerFront} alt="Front" className="w-full h-full object-cover" onError={(e) => e.currentTarget.style.display = 'none'} />
+                </div>
+              </div>
+              {customerSide && (
+                <div className="space-y-2">
+                  <p className="text-xs text-muted-foreground font-medium">Side View</p>
+                  <div className="aspect-[4/3] rounded-lg overflow-hidden border bg-muted">
+                    <img src={customerSide} alt="Side" className="w-full h-full object-cover" onError={(e) => e.currentTarget.style.display = 'none'} />
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* RBI Compliance */}
+        <Card>
+          <CardHeader className="flex flex-row items-center gap-4 pb-2">
+            <div className="p-2 bg-primary/10 rounded-lg">
+              <Shield className="w-6 h-6 text-primary" />
+            </div>
+            <div>
+              <CardTitle className="text-lg">RBI Compliance</CardTitle>
+              <CardDescription>Jewellery inventory and compliance check</CardDescription>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="flex items-center justify-between p-4 bg-muted/30 rounded-lg border">
+              <div className="space-y-1">
+                <p className="text-sm text-muted-foreground">Total Items</p>
+                <p className="text-2xl font-bold font-poppins text-primary">{rbiData.totalItems}</p>
+              </div>
+              <div className="space-y-1 text-right">
+                <p className="text-sm text-muted-foreground">Compliance Date</p>
+                <div className="flex items-center gap-1.5 text-sm font-medium">
+                  <Clock className="w-4 h-4 text-muted-foreground" />
+                  {formatTimestamp(new Date(rbiData.timestamp))}
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <p className="text-sm font-semibold flex items-center gap-2">
+                <Camera className="w-4 h-4" />
+                Captured Items ({jewelleryItems.length})
+              </p>
+              <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-3">
+                {jewelleryItems.map((item) => (
+                  <div key={item.itemNumber} className="space-y-1 group">
+                    <div className="aspect-square rounded-lg overflow-hidden border bg-muted relative">
+                      <img src={item.image} alt={`Item ${item.itemNumber}`} className="w-full h-full object-cover transition-transform group-hover:scale-110" />
+                    </div>
+                    <p className="text-[10px] text-center font-medium text-muted-foreground">Item {item.itemNumber}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {rbiData.overallImages && rbiData.overallImages.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-sm font-semibold">Overall Collection Image</p>
+                <div className="h-48 rounded-lg overflow-hidden border bg-muted">
+                  <img src={rbiData.overallImages[0].image} alt="Overall" className="w-full h-full object-cover" />
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Purity Results (2/3) */}
+          <Card className="lg:col-span-2">
+            <CardHeader className="flex flex-row items-center gap-4 pb-2">
+              <div className="p-2 bg-blue-500/10 rounded-lg">
+                <FlaskConical className="w-6 h-6 text-blue-600" />
+              </div>
+              <div>
+                <CardTitle className="text-lg">Purity Testing</CardTitle>
+                <CardDescription>AI-verified purity analysis results</CardDescription>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {purityResults ? (
+                <div className="space-y-6">
+                  <div className="grid sm:grid-cols-2 gap-4">
+                    <div className={cn(
+                      "p-4 rounded-xl border-2 flex items-center justify-between transition-all",
+                      purityResults.rubbingCompleted ? "bg-success/5 border-success/20" : "bg-muted border-border"
+                    )}>
+                      <div>
+                        <p className="text-sm font-semibold mb-1">Rubbing Test</p>
+                        <p className="text-xs text-muted-foreground">Streak verification</p>
+                      </div>
+                      <StatusBadge variant={purityResults.rubbingCompleted ? "success" : "default"}>
+                        {purityResults.rubbingCompleted ? "Completed" : "Pending"}
+                      </StatusBadge>
+                    </div>
+                    <div className={cn(
+                      "p-4 rounded-xl border-2 flex items-center justify-between transition-all",
+                      purityResults.acidCompleted ? "bg-success/5 border-success/20" : "bg-muted border-border"
+                    )}>
+                      <div>
+                        <p className="text-sm font-semibold mb-1">Acid Test</p>
+                        <p className="text-xs text-muted-foreground">Chemical verification</p>
+                      </div>
+                      <StatusBadge variant={purityResults.acidCompleted ? "success" : "default"}>
+                        {purityResults.acidCompleted ? "Completed" : "Pending"}
+                      </StatusBadge>
+                    </div>
+                  </div>
+
+                  {purityResults.detectedActivities && purityResults.detectedActivities.length > 0 && (
+                    <div className="space-y-3">
+                      <p className="text-sm font-semibold text-muted-foreground">Activity Log</p>
+                      <div className="space-y-2 max-h-[200px] overflow-y-auto pr-1">
+                        {purityResults.detectedActivities.map((activity, index) => (
+                          <div key={index} className="flex items-center justify-between p-3 rounded-lg bg-muted/50 border text-sm">
+                            <div className="flex items-center gap-2">
+                              <div className="h-2 w-2 rounded-full bg-blue-500" />
+                              <span className="font-medium">
+                                {activity.activity === 'rubbing' ? 'Rubbing Detected' : 'Acid Application Detected'}
+                              </span>
+                            </div>
+                            <span className="text-xs text-muted-foreground font-mono">
+                              {new Date(activity.timestamp).toLocaleTimeString()}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   )}
                 </div>
-              </div>
-            </div>
-
-            <div className="bg-gradient-to-r from-[hsl(158,30%,95%)] to-[hsl(158,25%,92%)] rounded-[30px] p-8 border-2 border-[hsl(158,25%,85%)] shadow-lg">
-              <div className="flex items-center gap-4 mb-6">
-                <Camera className="w-8 h-8 text-[hsl(158,82%,18%)]" />
-                <h2 className="text-2xl font-bold text-[hsl(158,82%,18%)] tracking-wide">Customer Images</h2>
-              </div>
-              <div className="grid md:grid-cols-2 gap-8">
-                <div>
-                  <p className="text-lg font-bold text-[hsl(158,82%,18%)] mb-4">Front View</p>
-                  <img
-                    src={customerFront}
-                    alt="Customer Front"
-                    className="w-full h-56 object-cover rounded-2xl border-4 border-[hsl(158,50%,75%)] shadow-lg"
-                    onError={(e) => {
-                      console.error('Failed to load customer front image:', customerFront?.substring(0, 50));
-                      e.currentTarget.style.display = 'none';
-                    }}
-                    onLoad={() => {
-                      console.log('Successfully loaded customer front image');
-                    }}
-                  />
+              ) : (
+                <div className="text-center py-8">
+                  <p className="text-muted-foreground">No purity test results available</p>
                 </div>
-                {customerSide && (
-                  <div>
-                    <p className="text-lg font-bold text-[hsl(158,82%,18%)] mb-4">Side View</p>
-                    <img
-                      src={customerSide}
-                      alt="Customer Side"
-                      className="w-full h-56 object-cover rounded-2xl border-4 border-[hsl(158,50%,75%)] shadow-lg"
-                      onError={(e) => {
-                        console.error('Failed to load customer side image:', customerSide?.substring(0, 50));
-                        e.currentTarget.style.display = 'none';
-                      }}
-                      onLoad={() => {
-                        console.log('Successfully loaded customer side image');
-                      }}
-                    />
-                  </div>
-                )}
-              </div>
-            </div>
+              )}
+            </CardContent>
+          </Card>
 
-            <div className="bg-gradient-to-r from-[hsl(158,30%,95%)] to-[hsl(158,25%,92%)] rounded-[30px] p-8 border-2 border-[hsl(158,25%,85%)] shadow-lg">
-              <div className="flex items-center gap-4 mb-6">
-                <Shield className="w-8 h-8 text-[hsl(158,82%,18%)]" />
-                <h2 className="text-2xl font-bold text-[hsl(158,82%,18%)] tracking-wide">RBI Compliance</h2>
+          {/* GPS Data (1/3) */}
+          <Card>
+            <CardHeader className="flex flex-row items-center gap-4 pb-2">
+              <div className="p-2 bg-teal-500/10 rounded-lg">
+                <MapPin className="w-6 h-6 text-teal-600" />
               </div>
-              <div className="space-y-6">
-                <div>
-                  <p className="text-sm text-gray-600 mb-1">Total Items</p>
-                  <p className="text-lg font-semibold text-gray-900">{rbiData.totalItems}</p>
-                  <p className="text-sm text-gray-600 mt-2 mb-1">Compliance Timestamp</p>
-                  <p className="text-sm text-gray-700">{formatTimestamp(new Date(rbiData.timestamp))}</p>
-                </div>
-                {/* Overall Jewellery Image - only show if available */}
-                {rbiData.overallImages && rbiData.overallImages.length > 0 && (
-                  <div>
-                    <p className="text-sm font-semibold text-gray-700 mb-2">Overall Jewellery Image</p>
-                    <img
-                      src={rbiData.overallImages[0].image}
-                      alt="Overall Jewellery"
-                      className="w-full h-64 object-cover rounded-lg border-2 border-gray-300 shadow-md"
-                      onError={(e) => {
-                        console.error('Failed to load overall jewellery image:', rbiData.overallImages[0].image?.substring(0, 50));
-                        e.currentTarget.style.display = 'none';
-                      }}
-                      onLoad={() => {
-                        console.log('Successfully loaded overall jewellery image');
-                      }}
-                    />
-                  </div>
-                )}
-                <div>
-                  <p className="text-sm font-semibold text-gray-700 mb-3">
-                    Individual Items ({jewelleryItems.length})
-                  </p>
-                  <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3">
-                    {jewelleryItems.map((item) => (
-                      <div key={item.itemNumber} className="space-y-1">
-                        <div className="aspect-square rounded-lg overflow-hidden border-2 border-gray-300 shadow-sm">
-                          <img
-                            src={item.image}
-                            alt={`Item ${item.itemNumber}`}
-                            className="w-full h-full object-cover"
-                            onError={(e) => {
-                              console.error(`Failed to load image for item ${item.itemNumber}:`, item.image?.substring(0, 50));
-                              e.currentTarget.style.display = 'none';
-                            }}
-                            onLoad={() => {
-                              console.log(`Successfully loaded image for item ${item.itemNumber}`);
-                            }}
-                          />
-                        </div>
-                        <p className="text-xs font-semibold text-gray-700 text-center">
-                          Item {item.itemNumber}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+              <div>
+                <CardTitle className="text-lg">Location</CardTitle>
+                <CardDescription>Geo-verification</CardDescription>
               </div>
-            </div>
-
-            <div className="bg-gradient-to-r from-[hsl(158,30%,95%)] to-[hsl(158,25%,92%)] rounded-[30px] p-8 border-2 border-[hsl(158,25%,85%)] shadow-lg">
-              <div className="flex items-center gap-4 mb-6">
-                <FlaskConical className="w-8 h-8 text-[hsl(158,82%,18%)]" />
-                <h2 className="text-2xl font-bold text-[hsl(158,82%,18%)] tracking-wide">Purity Testing</h2>
-              </div>
-              <div className="space-y-6">
-                {purityResults ? (
-                  <div className="bg-white/80 backdrop-blur-sm p-6 rounded-2xl border-2 border-blue-200/50 shadow-md">
-                    <div className="grid md:grid-cols-2 gap-6 mb-6">
-                      <div className={`p-4 rounded-xl border-2 ${purityResults.rubbingCompleted
-                        ? 'bg-emerald-50 border-emerald-400'
-                        : 'bg-gray-50 border-gray-300'
-                        }`}>
-                        <p className="text-sm text-blue-600 font-semibold mb-2">Rubbing Test</p>
-                        <p className={`text-lg font-bold ${purityResults.rubbingCompleted ? 'text-emerald-700' : 'text-gray-600'
-                          }`}>
-                          {purityResults.rubbingCompleted ? '✅ Completed' : '⏳ Not Completed'}
-                        </p>
-                      </div>
-                      <div className={`p-4 rounded-xl border-2 ${purityResults.acidCompleted
-                        ? 'bg-blue-50 border-blue-400'
-                        : 'bg-gray-50 border-gray-300'
-                        }`}>
-                        <p className="text-sm text-blue-600 font-semibold mb-2">Acid Test</p>
-                        <p className={`text-lg font-bold ${purityResults.acidCompleted ? 'text-blue-700' : 'text-gray-600'
-                          }`}>
-                          {purityResults.acidCompleted ? '✅ Completed' : '⏳ Not Completed'}
-                        </p>
-                      </div>
-                    </div>
-                    {purityResults.detectedActivities && purityResults.detectedActivities.length > 0 && (
-                      <div className="mt-4">
-                        <p className="text-sm text-blue-600 font-semibold mb-3">Detected Activities</p>
-                        <div className="space-y-2">
-                          {purityResults.detectedActivities.map((activity, index) => (
-                            <div key={index} className="flex items-center justify-between bg-blue-50 p-3 rounded-lg">
-                              <span className="text-sm font-medium text-blue-900">
-                                {activity.activity === 'rubbing' ? 'Rubbing Activity' : 'Acid Testing Activity'}
-                              </span>
-                              <span className="text-xs text-blue-600">
-                                {new Date(activity.timestamp).toLocaleTimeString()}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <p className="text-blue-700 font-medium">No purity test results available</p>
-                )}
-              </div>
-            </div>
-            {/* PASTE GPS SECTION HERE */}
-            <div className="bg-gradient-to-r from-teal-50 to-cyan-100 rounded-2xl p-8 border-2 border-teal-200/60 shadow-lg">
-              <div className="flex items-center gap-4 mb-6">
-                <MapPin className="w-8 h-8 text-teal-600" />
-                <h2 className="text-2xl font-bold text-teal-900 tracking-wide">GPS Location</h2>
-              </div>
-
+            </CardHeader>
+            <CardContent className="space-y-4">
               {gpsLoading ? (
-                <div className="flex items-center gap-2 text-teal-600">
-                  <Loader2 className="h-5 w-5 animate-spin" />
-                  <span className="font-medium">Getting current location...</span>
+                <div className="flex items-center justify-center py-8 text-muted-foreground">
+                  <Loader2 className="w-5 h-5 animate-spin mr-2" />
+                  Getting location...
                 </div>
               ) : gpsError ? (
-                <div className="flex items-center gap-2 text-red-600">
-                  <AlertCircle className="h-5 w-5" />
-                  <span className="font-medium">{gpsError}</span>
+                <div className="p-3 rounded-lg bg-destructive/10 text-destructive text-sm flex items-start gap-2">
+                  <AlertCircle className="w-4 h-4 mt-0.5" />
+                  {gpsError}
                 </div>
               ) : gpsData ? (
-                <div className="grid md:grid-cols-2 gap-8 items-start">
-                  {/* Left: Map */}
-                  <div className="flex justify-center">
+                <>
+                  <div className="aspect-square rounded-lg overflow-hidden border bg-muted relative">
                     {gpsData.map_image ? (
-                      <img
-                        src={gpsData.map_image}
-                        alt="GPS Map"
-                        className="w-48 h-48 rounded-2xl shadow-xl border-2 border-teal-200 object-cover"
-                      />
+                      <img src={gpsData.map_image} alt="Map" className="w-full h-full object-cover" />
                     ) : (
-                      <div className="w-48 h-48 bg-gray-100 rounded-2xl border-2 border-teal-200 flex items-center justify-center">
-                        <p className="text-gray-500 text-sm">Map not available</p>
-                      </div>
+                      <div className="absolute inset-0 flex items-center justify-center text-xs text-muted-foreground">Map Unavailable</div>
                     )}
                   </div>
-
-                  {/* Right: Details */}
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-2 text-sm font-semibold text-teal-700">
-                      <MapPin className="h-5 w-5" />
-                      <span>
-                        {gpsData.latitude.toFixed(6)}, {gpsData.longitude.toFixed(6)}
-                      </span>
-                      <Globe className="h-4 w-4 text-cyan-600" />
-                      <span className="text-xs uppercase tracking-wider">
-                        {gpsData.source}
-                      </span>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex items-start gap-2">
+                      <MapPin className="w-4 h-4 text-primary mt-0.5 shrink-0" />
+                      <div>
+                        <p className="font-medium">Coordinates</p>
+                        <p className="text-muted-foreground text-xs font-mono">{gpsData.latitude.toFixed(6)}, {gpsData.longitude.toFixed(6)}</p>
+                      </div>
                     </div>
-
-                    <p className="text-teal-700 font-medium">
-                      {gpsData.address || 'Address not available'}
-                    </p>
-
-                    <p className="text-xs text-teal-600">
-                      Captured: {formatTimestamp(new Date(gpsData.timestamp))}
-                    </p>
+                    <div className="flex items-start gap-2">
+                      <Globe className="w-4 h-4 text-primary mt-0.5 shrink-0" />
+                      <div>
+                        <p className="font-medium">Address</p>
+                        <p className="text-muted-foreground text-xs">{gpsData.address || "Unknown Address"}</p>
+                      </div>
+                    </div>
+                    <div className="text-xs text-muted-foreground pt-2 border-t text-center">
+                      Timestamp: {formatTimestamp(new Date(gpsData.timestamp))}
+                    </div>
                   </div>
-                </div>
+                </>
               ) : (
-                <p className="text-teal-700 font-medium">No location data available</p>
+                <div className="text-center py-8 text-muted-foreground">No GPS Data</div>
               )}
-            </div>
+            </CardContent>
+          </Card>
+        </div>
 
+        {/* Action Footer */}
+        <div className="fixed bottom-0 left-0 right-0 p-4 bg-background/80 backdrop-blur-md border-t z-40 shadow-up">
+          <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
+            <Button variant="ghost" onClick={() => navigate('/purity-testing')} className="text-muted-foreground">
+              <ArrowLeft className="w-4 h-4 mr-2" /> Back to Tests
+            </Button>
 
-
-            <div className="bg-gradient-to-br from-emerald-50 to-green-50 rounded-2xl p-8 border-2 border-emerald-200/60 shadow-lg">
-              <div className="flex items-center gap-4">
-                <CheckCircle className="w-10 h-10 text-emerald-600" />
-                <div>
-                  <p className="text-2xl font-bold text-emerald-900 tracking-wide">
-                    Appraisal Documentation Complete
-                  </p>
-                  <p className="text-lg text-emerald-700 font-medium">
-                    All required steps have been completed successfully
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-
-          <div className="bg-gradient-to-r from-blue-100 to-indigo-100 px-10 py-8 flex justify-between border-t border-blue-200/50">
-            <button
-              onClick={() => navigate('/purity-testing')}
-              className="px-8 py-4 bg-white/80 hover:bg-white text-blue-700 rounded-2xl font-bold transition-all duration-300 flex items-center gap-3 shadow-lg hover:shadow-xl border border-blue-200"
-            >
-              <ArrowLeft className="w-6 h-6" />
-              Back
-            </button>
-            <button
+            <Button
               onClick={handleFinish}
               disabled={isLoading}
-              className="px-10 py-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-2xl font-bold transition-all duration-300 shadow-xl hover:shadow-2xl flex items-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
+              size="lg"
+              className="shadow-lg shadow-success/20 hover:shadow-success/30 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 border-0"
             >
-              <Home className="w-6 h-6" />
-              {isLoading ? 'Finishing...' : 'Finish & Home'}
-            </button>
+              {isLoading ? (
+                <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Finalizing...</>
+              ) : (
+                <><Home className="w-4 h-4 mr-2" /> Submit & Finish Appraisal</>
+              )}
+            </Button>
           </div>
         </div>
+
       </div>
-    </div>
+    </ModernDashboardLayout>
   );
 }

@@ -1,13 +1,17 @@
 import { useMemo, useState, useRef } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { HoverButton } from "@/components/ui/hover-button";
-import { LogOut, Camera, FileText, X, CheckCircle, User, Settings } from "lucide-react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, StatCard, FeatureCard } from "@/components/ui/card";
+import { ModernDashboardLayout } from "@/components/layouts/ModernDashboardLayout";
+import { StatusBadge, LiveBadge } from "@/components/ui/status-badge";
+import {
+  LogOut, Camera, FileText, X, CheckCircle, User, Settings,
+  Play, Sparkles, Shield, FlaskConical, ChevronRight, Clock,
+  TrendingUp, Activity
+} from "lucide-react";
 import { toast } from "@/hooks/use-toast";
-import { AuroraLayout } from "@/components/layouts/AuroraLayout";
-import { DicedHeroSection } from "@/components/ui/diced-hero-section";
-import LiveCamera, { LiveCameraRef } from "@/components/LiveCamera";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import LiveCamera, { LiveCameraRef } from "@/components/LiveCamera";
 import FacialRecognition from "@/components/FacialRecognition";
 
 const stageToStepKey: Record<string, number> = {
@@ -20,7 +24,6 @@ const stageToStepKey: Record<string, number> = {
 
 const Dashboard = () => {
   const navigate = useNavigate();
-  const [userName] = useState("Appraiser");
   const [showCameraTest, setShowCameraTest] = useState(false);
   const [showFacialRecognition, setShowFacialRecognition] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
@@ -35,29 +38,24 @@ const Dashboard = () => {
       setCameraError(null);
       setIsCameraTesting(true);
 
-      // Check if camera is available
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
         throw new Error("Camera not supported on this browser/device");
       }
 
-      // Check for HTTPS (required for camera access)
       if (location.protocol !== 'https:' && location.hostname !== 'localhost') {
         throw new Error("Camera access requires HTTPS connection");
       }
 
-      // Request camera permission first
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
           video: { width: 1280, height: 720 }
         });
 
-        // Test if camera is actually working
         const track = stream.getVideoTracks()[0];
         if (!track) {
           throw new Error("No camera device found");
         }
 
-        // Stop the test stream immediately
         stream.getTracks().forEach(track => track.stop());
 
         setShowCameraTest(true);
@@ -99,7 +97,6 @@ const Dashboard = () => {
       description: "Camera quality check completed successfully!",
     });
 
-    // Auto-close after 2 seconds
     setTimeout(() => {
       setShowCameraTest(false);
       setCameraTestComplete(false);
@@ -112,20 +109,9 @@ const Dashboard = () => {
     setCameraError(null);
   };
 
-  const handleSignOut = () => {
-    toast({
-      title: "Signed out",
-      description: "You have been successfully signed out.",
-    });
-    navigate("/");
-  };
-
   const handleStartAppraisal = () => {
-    // Clear any existing appraiser data
     localStorage.removeItem("currentAppraiser");
     localStorage.removeItem("jewelleryItems");
-
-    // Start facial recognition workflow
     setShowFacialRecognition(true);
   };
 
@@ -135,19 +121,16 @@ const Dashboard = () => {
       title: "Welcome Back!",
       description: `Starting new appraisal for ${appraiser.name}`,
     });
-    // Navigate to customer image capture since appraiser is already identified
     navigate("/customer-image");
   };
 
   const handleNewAppraiserRequired = (capturedImage: string) => {
     setShowFacialRecognition(false);
-    // Store the captured image for the new appraiser registration
     localStorage.setItem("newAppraiserPhoto", capturedImage);
     toast({
       title: "New Appraiser Registration",
       description: "Please provide your details to complete registration.",
     });
-    // Navigate to appraiser details for new registration
     navigate("/appraiser-details");
   };
 
@@ -155,134 +138,176 @@ const Dashboard = () => {
     setShowFacialRecognition(false);
   };
 
-  const goldAppraisalSlides = [
-    {
-      title: "Gold Jewelry Set",
-      image: "/hero_jewelry_1.png",
-    },
-    {
-      title: "Traditional Bangles",
-      image: "/hero_jewelry_2.png",
-    },
-    {
-      title: "Designer Rings",
-      image: "/hero_jewelry_3.png",
-    },
-    {
-      title: "Premium Pendant",
-      image: "/hero_jewelry_4.png",
-    },
+  // Quick stats data (would come from API in production)
+  const quickStats = [
+    { label: "Today's Appraisals", value: 12, trend: { value: 8, isPositive: true }, icon: <Activity className="w-6 h-6 text-primary" /> },
+    { label: "Pending Reviews", value: 3, icon: <Clock className="w-6 h-6 text-warning" /> },
+    { label: "Completed", value: 9, trend: { value: 15, isPositive: true }, icon: <CheckCircle className="w-6 h-6 text-success" /> },
+  ];
+
+  // Workflow steps
+  const workflowSteps = [
+    { icon: User, title: "Appraiser ID", description: "Facial recognition verification", color: "primary" },
+    { icon: Camera, title: "Customer Photo", description: "Capture customer identification", color: "primary" },
+    { icon: Shield, title: "RBI Compliance", description: "Document gold items", color: "primary" },
+    { icon: FlaskConical, title: "Purity Testing", description: "AI-powered analysis", color: "secondary" },
   ];
 
   return (
-    <div className="min-h-screen bg-[#FFFDF7]">
-      {/* Header */}
-      <header className="border-b border-[hsl(158,20%,90%)] bg-white/90 dark:bg-[hsl(158,30%,10%)]/90 backdrop-blur-xl shadow-sm">
-        <div className="max-w-7xl mx-auto px-6 py-2.5 flex items-center justify-end">
-          <div className="flex items-center gap-3">
-            <span className="text-xs text-[hsl(158,82%,18%)] dark:text-[hsl(48,30%,85%)]">{userName}</span>
-            <Button variant="ghost" size="sm" onClick={() => navigate('/camera-settings')} className="h-8 text-xs">
-              <Settings className="mr-1.5 h-3.5 w-3.5" />
-              Settings
-            </Button>
-            <Button variant="ghost" size="sm" onClick={handleSignOut} className="h-8 text-xs">
-              <LogOut className="mr-1.5 h-3.5 w-3.5" />
-              Sign Out
-            </Button>
+    <ModernDashboardLayout notificationCount={2}>
+      <div className="space-y-8 animate-fade-in">
+        {/* Hero Section */}
+        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-primary via-primary to-primary/80 p-8 md:p-12">
+          {/* Background Pattern */}
+          <div className="absolute inset-0 opacity-10">
+            <div className="absolute -right-20 -top-20 w-80 h-80 rounded-full bg-secondary blur-3xl"></div>
+            <div className="absolute -left-20 -bottom-20 w-60 h-60 rounded-full bg-white blur-2xl"></div>
+          </div>
+
+          <div className="relative z-10 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
+            <div className="space-y-4">
+              <div className="flex items-center gap-3">
+                <StatusBadge variant="live" size="sm">
+                  <span className="flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-current animate-pulse"></span>
+                    System Online
+                  </span>
+                </StatusBadge>
+              </div>
+              <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold text-white font-poppins leading-tight">
+                Gold Guardian<span className="text-secondary"> Pro</span>
+              </h1>
+              <p className="text-white/80 text-lg max-w-xl">
+                AI-powered gold jewelry appraisals optimized for banking workflows and RBI compliance.
+              </p>
+              <div className="flex flex-wrap gap-3 pt-2">
+                <Button
+                  onClick={handleStartAppraisal}
+                  variant="secondary"
+                  size="lg"
+                  className="gap-2 font-bold shadow-lg"
+                >
+                  <Play className="w-5 h-5" />
+                  Start New Appraisal
+                </Button>
+                <Button
+                  onClick={() => navigate("/records")}
+                  variant="outline"
+                  size="lg"
+                  className="gap-2 border-white/30 text-white hover:bg-white/10 hover:text-white"
+                >
+                  <FileText className="w-5 h-5" />
+                  View Records
+                </Button>
+              </div>
+            </div>
+
+            {/* Hero Image */}
+            <div className="hidden lg:block">
+              <div className="relative w-64 h-64">
+                <div className="absolute inset-0 rounded-2xl bg-secondary/20 backdrop-blur-sm border border-white/20 overflow-hidden">
+                  <img
+                    src="/hero_jewelry_1.png"
+                    alt="Gold Jewelry"
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      e.currentTarget.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Crect fill='%23FFDD44' width='200' height='200'/%3E%3Ctext fill='%23101585' font-family='sans-serif' font-size='24' x='50%25' y='50%25' text-anchor='middle' dy='.3em'%3EGold%3C/text%3E%3C/svg%3E";
+                    }}
+                  />
+                </div>
+                <Sparkles className="absolute -top-3 -right-3 w-8 h-8 text-secondary animate-pulse" />
+              </div>
+            </div>
           </div>
         </div>
-      </header>
 
-      {/* Logo Section */}
-      <div className="flex justify-start px-6 py-3">
-        <img
-          src="/Embsys%20Intelligence%20logo.png"
-          alt="Embsys Intelligence"
-          className="h-24 w-auto"
-        />
-      </div>
-
-      {/* Hero Section */}
-      <main className="px-4 py-2">
-        <div className="[&_[data-diced-top-text]]:font-semibold [&_[data-diced-main-text]]:font-bold [&_[data-diced-main-text]]:leading-tight [&_[data-diced-sub-text]]:leading-relaxed [&_[data-diced-sub-text]]:font-normal lobster-subtext">
-          <DicedHeroSection
-            topText="AI-Powered Gold Appraisals"
-            mainText="Gold Guardian Pro"
-            subMainText="Fast, accurate gold jewelry appraisals powered by AI technology—optimized for banking workflows and compliance."
-            buttonText="Start Appraisal"
-            slides={goldAppraisalSlides}
-            onMainButtonClick={handleStartAppraisal}
-            onGridImageClick={(index) => {
-              console.log(`Image ${index} clicked`);
-            }}
-            extraActions={
-              <div className="hidden md:flex items-center gap-3">
-                <HoverButton
-                  onClick={() => navigate("/records")}
-                  className="min-w-[240px] flex items-center justify-center gap-2 text-base"
-                >
-                  <FileText className="h-5 w-5" />
-                  View All Records
-                </HoverButton>
-                <HoverButton
-                  onClick={handleCameraQualityCheck}
-                  disabled={isCameraTesting}
-                  className="min-w-[240px] flex items-center justify-center gap-2 text-base"
-                >
-                  <Camera className="h-5 w-5" />
-                  {isCameraTesting ? "Testing Camera..." : "Camera Quality Check"}
-                </HoverButton>
-              </div>
-            }
-            customMainButton={
-              <HoverButton
-                onClick={handleStartAppraisal}
-                className="min-w-[240px] flex items-center justify-center gap-2 text-base"
-              >
-                <User className="h-5 w-5" />
-                Start Appraisal
-              </HoverButton>
-            }
-            topTextStyle={{
-              color: "var(--diced-hero-section-top-text)",
-              fontSize: "1.5rem"
-            }}
-            mainTextStyle={{
-              fontSize: "clamp(3rem, 8vw, 4.5rem)",
-              gradient: "linear-gradient(45deg, var(--diced-hero-section-main-gradient-from), var(--diced-hero-section-main-gradient-to))",
-              fontFamily: "'Playfair Display', 'Cinzel', serif",
-              fontStyle: "italic"
-            }}
-            subMainTextStyle={{
-              color: "var(--diced-hero-section-sub-text)",
-              fontSize: "1.25rem",
-              fontFamily: "'Poppins', sans-serif",
-              gradient: "linear-gradient(to right, hsl(158, 82%, 18%), hsl(158, 70%, 35%))"
-            }}
-            buttonStyle={{
-              backgroundColor: "var(--diced-hero-section-button-bg)",
-              color: "var(--diced-hero-section-button-fg)",
-              borderRadius: "2rem",
-              hoverColor: "var(--diced-hero-section-button-hover-bg)",
-              hoverForeground: "var(--diced-hero-section-button-hover-fg)",
-            }}
-            separatorColor="var(--diced-hero-section-separator)"
-            mobileBreakpoint={1000}
-            fontFamily="inherit"
-          />
+        {/* Quick Stats */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {quickStats.map((stat, index) => (
+            <StatCard
+              key={index}
+              label={stat.label}
+              value={stat.value}
+              trend={stat.trend}
+              icon={stat.icon}
+            />
+          ))}
         </div>
 
-        {/* Quick Action Buttons Row is now integrated into hero via extraActions */}
+        {/* Quick Actions */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Main Action Card */}
+          <Card className="lg:col-span-2 overflow-hidden">
+            <CardHeader className="pb-4">
+              <CardTitle className="flex items-center gap-2">
+                <Sparkles className="w-5 h-5 text-secondary" />
+                Appraisal Workflow
+              </CardTitle>
+              <CardDescription>
+                Complete the following steps for a comprehensive gold assessment
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {workflowSteps.map((step, index) => (
+                  <div
+                    key={index}
+                    className="group flex flex-col items-center text-center p-4 rounded-xl bg-muted/50 hover:bg-muted transition-colors cursor-pointer"
+                  >
+                    <div className={`flex items-center justify-center w-12 h-12 rounded-xl mb-3 transition-colors ${step.color === "secondary"
+                        ? "bg-secondary/20 text-secondary group-hover:bg-secondary group-hover:text-secondary-foreground"
+                        : "bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground"
+                      }`}>
+                      <step.icon className="w-6 h-6" />
+                    </div>
+                    <h4 className="font-semibold text-sm text-foreground">{step.title}</h4>
+                    <p className="text-xs text-muted-foreground mt-1">{step.description}</p>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
 
+          {/* Camera Check Card */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Camera className="w-5 h-5 text-secondary" />
+                Camera Status
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center gap-3 p-4 rounded-xl bg-muted/50">
+                <div className="flex items-center justify-center w-10 h-10 rounded-full bg-success/20">
+                  <CheckCircle className="w-5 h-5 text-success" />
+                </div>
+                <div>
+                  <p className="font-medium text-sm">Camera Ready</p>
+                  <p className="text-xs text-muted-foreground">Last checked: Just now</p>
+                </div>
+              </div>
+              <Button
+                onClick={handleCameraQualityCheck}
+                disabled={isCameraTesting}
+                variant="outline"
+                className="w-full gap-2"
+              >
+                <Camera className="w-4 h-4" />
+                {isCameraTesting ? "Testing..." : "Run Quality Check"}
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
 
-      </main>
+        
+      </div>
 
       {/* Camera Quality Test Dialog */}
       <Dialog open={showCameraTest} onOpenChange={handleCloseCameraTest}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Camera className="w-5 h-5" />
+              <Camera className="w-5 h-5 text-primary" />
               Camera Quality Check
             </DialogTitle>
           </DialogHeader>
@@ -290,11 +315,11 @@ const Dashboard = () => {
           <div className="space-y-4">
             {cameraError ? (
               <div className="text-center p-8">
-                <div className="w-16 h-16 mx-auto mb-4 bg-red-100 rounded-full flex items-center justify-center">
-                  <X className="w-8 h-8 text-red-500" />
+                <div className="w-16 h-16 mx-auto mb-4 bg-destructive/10 rounded-full flex items-center justify-center">
+                  <X className="w-8 h-8 text-destructive" />
                 </div>
-                <h3 className="text-lg font-semibold text-red-700 mb-2">Camera Test Failed</h3>
-                <p className="text-red-600 mb-4">{cameraError}</p>
+                <h3 className="text-lg font-semibold text-destructive mb-2">Camera Test Failed</h3>
+                <p className="text-muted-foreground mb-4">{cameraError}</p>
                 <div className="flex gap-2 justify-center">
                   <Button onClick={handleCloseCameraTest} variant="outline">
                     Close
@@ -306,22 +331,22 @@ const Dashboard = () => {
               </div>
             ) : cameraTestComplete ? (
               <div className="text-center p-8">
-                <div className="w-16 h-16 mx-auto mb-4 bg-green-100 rounded-full flex items-center justify-center">
-                  <CheckCircle className="w-8 h-8 text-green-500" />
+                <div className="w-16 h-16 mx-auto mb-4 bg-success/10 rounded-full flex items-center justify-center">
+                  <CheckCircle className="w-8 h-8 text-success" />
                 </div>
-                <h3 className="text-lg font-semibold text-green-700 mb-2">Camera Test Successful!</h3>
-                <p className="text-green-600">Your camera is working properly and ready for use.</p>
+                <h3 className="text-lg font-semibold text-success mb-2">Camera Test Successful!</h3>
+                <p className="text-muted-foreground">Your camera is working properly and ready for use.</p>
               </div>
             ) : (
               <div className="space-y-4">
                 <div className="text-center mb-4">
                   <h3 className="text-lg font-semibold mb-2">Testing Camera Quality</h3>
-                  <p className="text-gray-600">
+                  <p className="text-muted-foreground">
                     Please allow camera access and capture a test photo to verify camera functionality.
                   </p>
                 </div>
 
-                <div className="border-2 border-dashed border-gray-300 rounded-lg p-4">
+                <div className="border-2 border-dashed border-border rounded-xl p-4">
                   <LiveCamera
                     ref={cameraRef}
                     currentStepKey={currentStepKey}
@@ -336,7 +361,6 @@ const Dashboard = () => {
                   </Button>
                   <Button
                     onClick={() => cameraRef.current?.capturePhoto()}
-                    className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700"
                   >
                     <Camera className="w-4 h-4 mr-2" />
                     Test Capture
@@ -353,7 +377,7 @@ const Dashboard = () => {
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <User className="w-5 h-5" />
+              <User className="w-5 h-5 text-primary" />
               Appraiser Identification
             </DialogTitle>
           </DialogHeader>
@@ -365,7 +389,7 @@ const Dashboard = () => {
           />
         </DialogContent>
       </Dialog>
-    </div >
+    </ModernDashboardLayout>
   );
 };
 
