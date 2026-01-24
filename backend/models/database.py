@@ -336,14 +336,15 @@ class Database:
                 raise ValueError("Session not found")
 
             results = json.dumps(data) if isinstance(data, (dict, list)) else data
+            total_items = data.get('total_items', 0) if isinstance(data, dict) else 0
 
             cursor.execute('''
                 INSERT INTO purity_test_details (
-                    session_id, results,
+                    session_id, results, total_items,
                     name, bank, branch, email, phone, appraiser_id, image_data
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             ''', (
-                session_id, results,
+                session_id, results, total_items,
                 common['name'], common['bank'], common['branch'], common['email'], 
                 common['phone'], common['appraiser_id'], common['image_data']
             ))
