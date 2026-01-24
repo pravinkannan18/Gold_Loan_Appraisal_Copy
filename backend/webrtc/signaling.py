@@ -18,10 +18,8 @@ try:
     from aiortc import RTCPeerConnection, RTCSessionDescription, RTCIceCandidate
     from aiortc.contrib.media import MediaRelay
     AIORTC_AVAILABLE = True
-    print("✅ aiortc available - WebRTC enabled")
 except ImportError:
     AIORTC_AVAILABLE = False
-    print("⚠️ aiortc not available - Using WebSocket fallback mode")
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

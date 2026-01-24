@@ -1,6 +1,6 @@
 import { useMemo, useState, useRef, useEffect, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Camera, ArrowLeft, ArrowRight, Shield, CheckCircle, Sparkles, FileImage, Zap, MapPin, Globe, AlertCircle, Loader2, X } from 'lucide-react';
+import { Camera, ArrowLeft, ArrowRight, Shield, CheckCircle, Sparkles, FileImage, Zap, MapPin, Globe, AlertCircle, Loader2, X, Scan, Award } from 'lucide-react';
 import { StepIndicator } from '../components/journey/StepIndicator';
 import { LiveCamera, LiveCameraHandle } from '../components/journey/LiveCamera';
 import { showToast, cn } from '../lib/utils';
@@ -9,9 +9,26 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/ui/status-badge';
 
+interface ClassificationResult {
+  class_name: string;
+  confidence: number;
+  risk: string;
+  all_predictions?: Array<{ class_name: string; confidence: number }>;
+}
+
+interface DetectedRegion {
+  region_name: string;
+  class_name: string;
+  confidence: number;
+  sam_score: number;
+  image: string;
+}
+
 interface JewelleryItemCapture {
   itemNumber: number;
   image: string;
+  classification?: ClassificationResult;
+  detectedRegions?: DetectedRegion[];
 }
 
 interface OverallImageCapture {
@@ -39,6 +56,12 @@ export function RBICompliance() {
   const [currentCapturingItem, setCurrentCapturingItem] = useState<number | null>(null);
   const [captureMode, setCaptureMode] = useState<'overall' | 'individual' | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [classifying, setClassifying] = useState<number | null>(null);
+  const [enhancedMode, setEnhancedMode] = useState(false);
+  const [showRegionsPanel, setShowRegionsPanel] = useState(false);
+  const [detectedRegions, setDetectedRegions] = useState<DetectedRegion[]>([]);
+  const [selectedItemForRegions, setSelectedItemForRegions] = useState<number | null>(null);
+  const [showRiskReport, setShowRiskReport] = useState(false);
   const stage = useMemo(() => new URLSearchParams(location.search).get("stage") || "customer", [location.search]);
   const currentStepKey = stageToStepKey[stage] || 1;
   // Initialize selectedCameraId from localStorage saved setting
@@ -175,6 +198,80 @@ export function RBICompliance() {
       showToast(`Item ${currentCapturingItem} captured!`, 'success');
     }
   };
+
+  const handleRiskAnalysis = async (itemNumber: number) => {
+    const item = capturedItems.find(i => i.itemNumber === itemNumber);
+    if (!item || !item.image) {
+      showToast('No image found for this item', 'error');
+      return;
+    }
+
+    setClassifying(itemNumber);
+    setShowRegionsPanel(true);
+    setSelectedItemForRegions(itemNumber);
+
+    try {
+      // Run both analyses in parallel for faster results
+      const [classifyResponse, enhancedResponse] = await Promise.all([
+        // Simple ResNet50 classification
+        fetch(`${import.meta.env.VITE_API_URL}/api/classification/analyze`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ image: item.image, item_number: itemNumber })
+        }),
+        // SAM3 enhanced detection
+        fetch(`${import.meta.env.VITE_API_URL}/api/classification/analyze-enhanced`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ image: item.image, item_number: itemNumber })
+        })
+      ]);
+
+      if (!classifyResponse.ok || !enhancedResponse.ok) {
+        throw new Error('Risk analysis failed');
+      }
+
+      const [classifyResult, enhancedResult] = await Promise.all([
+        classifyResponse.json(),
+        enhancedResponse.json()
+      ]);
+
+      // Update item with both classification and detected regions
+      if (classifyResult.success) {
+        const regions = enhancedResult.success ? enhancedResult.regions : [];
+        setDetectedRegions(regions);
+
+        setCapturedItems(prev =>
+          prev.map(i =>
+            i.itemNumber === itemNumber
+              ? {
+                ...i,
+                classification: classifyResult,
+                detectedRegions: regions
+              }
+              : i
+          )
+        );
+
+        const componentsMsg = regions.length > 0 ? ` | ${regions.length} components detected` : '';
+        showToast(
+          `${classifyResult.class_name} (${classifyResult.confidence}%)${componentsMsg}`,
+          'success'
+        );
+      } else {
+        const error = classifyResult.error || enhancedResult.error || 'Analysis failed';
+        showToast(error, 'error');
+        setDetectedRegions([]);
+      }
+    } catch (error: any) {
+      console.error('Risk analysis error:', error);
+      showToast('Failed to run risk analysis', 'error');
+      setDetectedRegions([]);
+    } finally {
+      setClassifying(null);
+    }
+  };
+
 
   const getItemImage = (itemNumber: number): string | undefined => {
     return capturedItems.find((item) => item.itemNumber === itemNumber)?.image;
@@ -487,15 +584,31 @@ export function RBICompliance() {
                             <Zap className="w-4 h-4 text-secondary-foreground" />
                             Individual Items ({capturedItems.length}/{totalItems})
                           </h4>
-                          {capturedItems.length < totalItems && (
-                            <Button size="sm" variant="outline" onClick={handleOpenIndividualCamera} className="gap-1">
-                              <Camera className="w-3 h-3" /> Capture Next
-                            </Button>
-                          )}
+                          <div className="flex items-center gap-2">
+                            {capturedItems.length < totalItems && (
+                              <Button size="sm" variant="outline" onClick={handleOpenIndividualCamera} className="gap-1">
+                                <Camera className="w-3 h-3" /> Capture Next
+                              </Button>
+                            )}
+                            {(overallImages.length > 0 || capturedItems.length > 0) && (
+                              <Button
+                                size="sm"
+                                variant={showRiskReport ? "secondary" : "outline"}
+                                onClick={() => setShowRiskReport(!showRiskReport)}
+                                className="gap-1.5"
+                              >
+                                <Award className={cn("w-3.5 h-3.5", showRiskReport && "text-primary-foreground")} />
+                                {showRiskReport ? "Hide Risk Analysis" : "Show Risk Analysis"}
+                              </Button>
+                            )}
+                          </div>
                         </div>
                         <div className="grid grid-cols-4 gap-2">
                           {Array.from({ length: Math.min(totalItems, 8) }, (_, i) => i + 1).map((itemNumber) => {
-                            const itemImage = getItemImage(itemNumber);
+                            const item = capturedItems.find(i => i.itemNumber === itemNumber);
+                            const itemImage = item?.image;
+                            const classification = item?.classification;
+
                             return (
                               <div
                                 key={itemNumber}
@@ -507,16 +620,38 @@ export function RBICompliance() {
                                 {itemImage ? (
                                   <>
                                     <img src={itemImage} alt={`Item ${itemNumber}`} className="w-full h-full object-cover" />
-                                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1">
                                       <button
                                         onClick={() => handleOpenItemCamera(itemNumber)}
-                                        className="p-2 bg-primary text-white rounded-lg hover:bg-primary/90"
+                                        className="p-1.5 bg-primary text-white rounded-lg hover:bg-primary/90 text-xs"
                                         title="Retake"
                                       >
-                                        <Camera className="w-4 h-4" />
+                                        <Camera className="w-3 h-3" />
+                                      </button>
+                                      <button
+                                        onClick={() => handleRiskAnalysis(item.itemNumber)}
+                                        disabled={classifying === itemNumber}
+                                        className="p-1.5 bg-secondary text-white rounded-lg hover:bg-secondary/90 text-xs disabled:opacity-50"
+                                        title="Classify"
+                                      >
+                                        {classifying === itemNumber ? (
+                                          <Loader2 className="w-3 h-3 animate-spin" />
+                                        ) : (
+                                          <Scan className="w-3 h-3" />
+                                        )}
                                       </button>
                                     </div>
                                     <span className="absolute bottom-1 left-1 text-xs font-bold text-white bg-black/50 px-1 rounded">#{itemNumber}</span>
+                                    {classification && (
+                                      <div className="absolute top-1 right-1">
+                                        <StatusBadge
+                                          variant="success"
+                                          size="sm"
+                                        >
+                                          <Award className="w-3 h-3" />
+                                        </StatusBadge>
+                                      </div>
+                                    )}
                                   </>
                                 ) : (
                                   <div
@@ -622,117 +757,243 @@ export function RBICompliance() {
           </CardContent>
         </Card>
 
-        {/* Image Galleries */}
-        {overallImages.length > 0 && (
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold flex items-center gap-2">
-              <FileImage className="w-5 h-5 text-primary" />
-              Captured Overall Images
-            </h3>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {overallImages.map((img) => (
-                <div key={img.id} className="group relative rounded-xl overflow-hidden border bg-background shadow-sm hover:shadow-md transition-all">
-                  <div className="aspect-video bg-muted">
-                    <img src={img.image} alt={`Overall ${img.id}`} className="w-full h-full object-cover" />
-                  </div>
-                  <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button
-                      onClick={() => handleRemoveOverallImage(img.id)}
-                      className="p-1.5 bg-destructive text-white rounded-lg shadow-sm hover:bg-destructive/90"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
-                  <div className="p-2 text-xs font-medium text-center bg-muted/30">
-                    Overall {img.id}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
 
-        {/* Individual Gallery */}
-        {capturedItems.length > 0 && (
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold flex items-center gap-2">
-              <Zap className="w-5 h-5 text-secondary-foreground" />
-              Captured Individual Items
-            </h3>
-            <div className="grid grid-cols-3 md:grid-cols-5 gap-4">
-              {Array.from({ length: totalItems }, (_, i) => i + 1).map((itemNumber) => {
-                const itemImage = getItemImage(itemNumber);
-                return (
-                  <div key={itemNumber} className={cn(
-                    "rounded-xl border p-2 transition-all",
-                    itemImage ? "bg-background border-success/30" : "bg-muted/20 border-border border-dashed"
-                  )}>
-                    <div className="aspect-square rounded-lg overflow-hidden bg-muted mb-2 relative">
-                      {itemImage ? (
-                        <>
-                          <img src={itemImage} alt={`Item ${itemNumber}`} className="w-full h-full object-cover" />
-                          <div className="absolute top-1 right-1 bg-success text-white rounded-full p-0.5">
-                            <CheckCircle className="w-3 h-3" />
-                          </div>
-                        </>
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-muted-foreground/30">
-                          <span className="text-xs">Pending</span>
+        {/* Image Galleries - Risk Analysis View */}
+        {showRiskReport && (
+          <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+
+
+            {/* Individual Gallery - Only shown in Risk Report mode */}
+            {showRiskReport && capturedItems.length > 0 && (
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold flex items-center gap-2">
+                  <Zap className="w-5 h-5 text-secondary-foreground" />
+                  Captured Individual Items
+                </h3>
+                <div className="grid grid-cols-3 md:grid-cols-5 gap-4">
+                  {Array.from({ length: totalItems }, (_, i) => i + 1).map((itemNumber) => {
+                    const item = capturedItems.find(i => i.itemNumber === itemNumber);
+                    const itemImage = item?.image;
+                    const classification = item?.classification;
+
+                    return (
+                      <div key={itemNumber} className={cn(
+                        "rounded-xl border p-2 transition-all",
+                        itemImage ? "bg-background border-success/30" : "bg-muted/20 border-border border-dashed"
+                      )}>
+                        <div className="aspect-square rounded-lg overflow-hidden bg-muted mb-2 relative">
+                          {itemImage ? (
+                            <>
+                              <img src={itemImage} alt={`Item ${itemNumber}`} className="w-full h-full object-cover" />
+                              <div className="absolute top-1 right-1 bg-success text-white rounded-full p-0.5">
+                                <CheckCircle className="w-3 h-3" />
+                              </div>
+                              {classification && (
+                                <div className="absolute top-1 left-1">
+                                  <StatusBadge
+                                    variant="success"
+                                    size="sm"
+                                  >
+                                    {classification.class_name?.substring(0, 12) || 'Classified'}
+                                  </StatusBadge>
+                                </div>
+                              )}
+                            </>
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-muted-foreground/30">
+                              <span className="text-xs">Pending</span>
+                            </div>
+                          )}
                         </div>
+                        <p className={cn(
+                          "text-xs text-center font-medium mb-1",
+                          itemImage ? "text-foreground" : "text-muted-foreground"
+                        )}>
+                          Item {itemNumber}
+                        </p>
+                        {classification && (
+                          <div className="space-y-1">
+                            <p className="text-xs text-center font-semibold text-foreground truncate" title={classification.class_name || 'Classified'}>
+                              {classification.class_name || 'Classified'}
+                            </p>
+                            <p className="text-[10px] text-center text-muted-foreground">
+                              {classification.confidence}% confidence
+                            </p>
+                            {/* Risk Level Badge */}
+                            {classification.risk && (
+                              <div className="flex items-center justify-center">
+                                <span className={cn(
+                                  "text-[10px] font-bold px-2 py-0.5 rounded",
+                                  classification.risk === 'HIGH' ? 'bg-red-500/20 text-red-700 dark:text-red-400' :
+                                    classification.risk === 'MEDIUM' ? 'bg-yellow-500/20 text-yellow-700 dark:text-yellow-400' :
+                                      'bg-green-500/20 text-green-700 dark:text-green-400'
+                                )}>
+                                  {classification.risk}
+                                </span>
+                              </div>
+                            )}
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="w-full h-6 text-[10px]"
+                              onClick={() => handleRiskAnalysis(itemNumber)}
+                              disabled={classifying === itemNumber}
+                            >
+                              {classifying === itemNumber ? (
+                                <><Loader2 className="w-2 h-2 mr-1 animate-spin" /> Analyzing...</>
+                              ) : (
+                                <><Award className="w-2 h-2 mr-1" /> Re-analyze</>
+                              )}
+                            </Button>
+                          </div>
+                        )}
+                        {itemImage && !classification && (
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            className="w-full h-6 text-[10px]"
+                            onClick={() => handleRiskAnalysis(itemNumber)}
+                            disabled={classifying === itemNumber}
+                          >
+                            {classifying === itemNumber ? (
+                              <><Loader2 className="w-2 h-2 mr-1 animate-spin" /> Analyzing...</>
+                            ) : (
+                              <><Award className="w-2 h-2 mr-1" /> Risk Analysis</>
+                            )}
+                          </Button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Detected Regions Panel - Enhanced UI */}
+            {showRegionsPanel && detectedRegions.length > 0 && (
+              <Card className="border-primary/20 bg-gradient-to-br from-card to-muted/20">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle className="flex items-center gap-2 text-lg">
+                        <Award className="w-5 h-5 text-primary" />
+                        {detectedRegions.length > 0
+                          ? `${detectedRegions.reduce((prev, current) =>
+                            (prev.sam_score > current.sam_score) ? prev : current
+                          ).region_name.replace('of the jewellery', '').trim()} (${detectedRegions.length})`
+                          : `Detected Components (${detectedRegions.length})`
+                        }
+                      </CardTitle>
+                      {selectedItemForRegions && (
+                        <CardDescription className="mt-1 text-xs">
+                          From Jewellery Item #{selectedItemForRegions}
+                        </CardDescription>
                       )}
                     </div>
-                    <p className={cn(
-                      "text-xs text-center font-medium",
-                      itemImage ? "text-foreground" : "text-muted-foreground"
-                    )}>
-                      Item {itemNumber}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setShowRegionsPanel(false);
+                        setSelectedItemForRegions(null);
+                      }}
+                      className="h-8 w-8 p-0"
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 max-h-[400px] overflow-y-auto pr-2">
+                    {detectedRegions.map((region, index) => (
+                      <div
+                        key={index}
+                        className="group border rounded-lg p-3 bg-card hover:shadow-lg hover:border-primary/40 transition-all duration-200"
+                      >
+                        {/* Thumbnail */}
+                        <div className="aspect-square rounded-md overflow-hidden bg-muted mb-2 border border-border">
+                          <img
+                            src={region.image}
+                            alt={region.region_name}
+                            className="w-full h-full object-contain transform group-hover:scale-105 transition-transform duration-200"
+                          />
+                        </div>
+
+                        {/* Component Info */}
+                        <div className="space-y-1">
+                          <p className="text-sm font-bold text-foreground text-center" title={region.region_name}>
+                            {region.region_name.replace('of the jewellery', '').trim()}
+                          </p>
+                          <div className="flex items-center justify-between text-[10px]">
+                            <span className="text-success font-semibold">{region.confidence}%</span>
+                            <span className="text-muted-foreground">SAM: {region.sam_score.toFixed(3)}</span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Summary Footer */}
+                  <div className="mt-4 pt-3 border-t flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">
+                      Total components detected: <strong className="text-foreground">{detectedRegions.length}</strong>
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setShowRegionsPanel(false);
+                        setSelectedItemForRegions(null);
+                      }}
+                    >
+                      Close
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Footer Navigation */}
+            <div className="fixed bottom-0 left-0 right-0 p-4 bg-background/80 backdrop-blur-md border-t z-40">
+              <div className="max-w-6xl mx-auto flex items-center justify-between gap-4">
+                <Button variant="ghost" onClick={() => navigate('/customer-image')}>
+                  <ArrowLeft className="w-4 h-4 mr-2" /> Back
+                </Button>
+
+                <div className="hidden md:flex items-center gap-6 text-sm">
+                  {gpsLoading ? (
+                    <span className="flex items-center text-muted-foreground"><Loader2 className="w-3 h-3 animate-spin mr-2" />Locating...</span>
+                  ) : gpsData ? (
+                    <span className="flex items-center font-medium text-primary">
+                      <MapPin className="w-3 h-3 mr-1" /> {gpsData.latitude.toFixed(4)}, {gpsData.longitude.toFixed(4)}
+                    </span>
+                  ) : null}
+                </div>
+
+                <div className="flex items-center gap-4">
+                  <div className="hidden sm:block text-right">
+                    <p className="text-xs font-semibold text-primary/80">
+                      {canProceed() ? "Ready to Proceed" : "Steps Incomplete"}
+                    </p>
+                    <p className="text-[10px] text-muted-foreground">
+                      {overallImages.length > 0 ? "Overall images captured" :
+                        capturedItems.length === totalItems ? "All items captured" : "Capture required"}
                     </p>
                   </div>
-                );
-              })}
+                  <Button
+                    size="lg"
+                    onClick={handleNext}
+                    disabled={isLoading || !canProceed()}
+                    className={cn(canProceed() ? "animate-pulse shadow-lg shadow-primary/20" : "")}
+                  >
+                    {isLoading ? "Saving..." : "Next Step"} <ArrowRight className="w-4 h-4 ml-2" />
+                  </Button>
+                </div>
+              </div>
             </div>
+
           </div>
         )}
-
-        {/* Footer Navigation */}
-        <div className="fixed bottom-0 left-0 right-0 p-4 bg-background/80 backdrop-blur-md border-t z-40">
-          <div className="max-w-6xl mx-auto flex items-center justify-between gap-4">
-            <Button variant="ghost" onClick={() => navigate('/customer-image')}>
-              <ArrowLeft className="w-4 h-4 mr-2" /> Back
-            </Button>
-
-            <div className="hidden md:flex items-center gap-6 text-sm">
-              {gpsLoading ? (
-                <span className="flex items-center text-muted-foreground"><Loader2 className="w-3 h-3 animate-spin mr-2" />Locating...</span>
-              ) : gpsData ? (
-                <span className="flex items-center font-medium text-primary">
-                  <MapPin className="w-3 h-3 mr-1" /> {gpsData.latitude.toFixed(4)}, {gpsData.longitude.toFixed(4)}
-                </span>
-              ) : null}
-            </div>
-
-            <div className="flex items-center gap-4">
-              <div className="hidden sm:block text-right">
-                <p className="text-xs font-semibold text-primary/80">
-                  {canProceed() ? "Ready to Proceed" : "Steps Incomplete"}
-                </p>
-                <p className="text-[10px] text-muted-foreground">
-                  {overallImages.length > 0 ? "Overall images captured" :
-                    capturedItems.length === totalItems ? "All items captured" : "Capture required"}
-                </p>
-              </div>
-              <Button
-                size="lg"
-                onClick={handleNext}
-                disabled={isLoading || !canProceed()}
-                className={cn(canProceed() ? "animate-pulse shadow-lg shadow-primary/20" : "")}
-              >
-                {isLoading ? "Saving..." : "Next Step"} <ArrowRight className="w-4 h-4 ml-2" />
-              </Button>
-            </div>
-          </div>
-        </div>
-
       </div>
     </ModernDashboardLayout>
   );

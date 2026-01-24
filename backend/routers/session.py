@@ -29,6 +29,7 @@ class JewelleryItemData(BaseModel):
     itemNumber: int
     image: str  # base64 image
     description: Optional[str] = None
+    classification: Optional[dict] = None  # {class, confidence, risk}
 
 class OverallImageData(BaseModel):
     id: int

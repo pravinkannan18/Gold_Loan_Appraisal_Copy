@@ -5,8 +5,11 @@ WebRTC-based real-time video streaming with aiortc
 """
 import os
 
-# Suppress ONNX Runtime CUDA warnings (YOLO uses PyTorch directly, not ONNX)
-os.environ["ORT_LOG_LEVEL"] = "ERROR"  # Suppress ONNX Runtime warnings
+import warnings
+
+# Suppress ONNX Runtime and other noisy warnings
+warnings.filterwarnings("ignore", category=UserWarning, module="onnxruntime")
+os.environ["ORT_LOG_LEVEL"] = "3"       # 3 is ERROR
 os.environ["ORT_DISABLE_CUDA"] = "1"   # Don't try to load CUDA for ONNX
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 
@@ -24,9 +27,10 @@ from models.database import Database
 from services.camera_service import CameraService
 from services.facial_recognition_service import FacialRecognitionService
 from services.gps_service import GPSService
+from services.classification_service import ClassificationService
 
 # Import routers
-from routers import appraiser, appraisal, camera, face, gps, webrtc, session
+from routers import appraiser, appraisal, camera, face, gps, webrtc, session, classification
 
 # ============================================================================
 # FastAPI App Initialization
@@ -68,6 +72,9 @@ facial_service = FacialRecognitionService(db)
 # GPS Service
 gps_service = GPSService()
 
+# Classification Service
+classification_service = ClassificationService()
+
 # ============================================================================
 # Dependency Injection for Routers
 # ============================================================================
@@ -79,6 +86,7 @@ session.set_database(db)
 camera.set_service(camera_service)
 face.set_service(facial_service)
 gps.set_service(gps_service)
+classification.set_service(classification_service)
 
 # ============================================================================
 # Register Routers
@@ -91,6 +99,7 @@ app.include_router(camera.router)
 app.include_router(face.router)
 app.include_router(gps.router)
 app.include_router(webrtc.router)
+app.include_router(classification.router)
 
 # ============================================================================
 # Root Endpoints
@@ -111,7 +120,8 @@ async def root():
             "camera": "/api/camera",
             "face": "/api/face",
             "webrtc": "/api/webrtc",
-            "gps": "/api/gps"
+            "gps": "/api/gps",
+            "classification": "/api/classification"
         }
     }
 
@@ -131,7 +141,8 @@ async def health_check():
             "camera": "available" if camera_service.check_camera_available() else "unavailable",
             "facial_recognition": "available" if facial_service.is_available() else "unavailable",
             "webrtc": "available" if webrtc_manager.is_available() else "unavailable",
-            "gps": "available" if gps_service.available else "unavailable"
+            "gps": "available" if gps_service.available else "unavailable",
+            "classification": "available" if classification_service.is_available() else "unavailable"
         }
     }
 
@@ -177,5 +188,5 @@ if __name__ == "__main__":
         host="0.0.0.0",
         port=8000,
         reload=True,
-        log_level="info"
+        log_level="warning"
     )
