@@ -298,21 +298,18 @@ class InferenceWorker:
                     "stage": "ACID",
                     "rubbing_confirmed": True
                 })
-                if self.RENDER_TEXT:
-                    cv2.putText(annotated, "RUBBING CONFIRMED! SWITCH TO ACID", (100, 360),
-                                cv2.FONT_HERSHEY_DUPLEX, 1.2, (0, 255, 255), 3)
+                        # large confirmation text intentionally removed from frame drawing
+                        # message is set in detection_status and will be rendered by the
+                        # video processor overlay to keep text sizing consistent
             elif self.RENDER_TEXT and not self.rubbing_confirmed:
-                cv2.putText(annotated, f"Visual confirmations: {self.visual_confirm_count}/3", (30, 400),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
+                # update message so overlay can render it consistently
+                self.detection_status["message"] = f"Visual confirmations: {self.visual_confirm_count}/3"
         
-        # Draw status text
+        # Set status message (rendered by video processor overlay for consistent sizing)
         if self.RENDER_TEXT:
-            cv2.putText(annotated, "STAGE 1: GOLD RUBBING", (30, 60), 
-                        cv2.FONT_HERSHEY_DUPLEX, 0.8, (255, 255, 255), 2)
-            cv2.putText(annotated, f"Visual: {'OK' if visual_ok else 'NOT OK'}", (30, 120), 
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0) if visual_ok else (0, 0, 255), 2)
-            cv2.putText(annotated, self.detection_status.get("message", "")[:80], 
-                        (30, annotated.shape[0] - 30), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+            # Keep detection_status.message up-to-date; overlay draws the message
+            self.detection_status["stage"] = self.stage
+            # message field already updated above for transitions and confirmations
         
         return annotated, detection_result
     

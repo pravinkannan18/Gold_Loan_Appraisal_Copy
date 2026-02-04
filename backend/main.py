@@ -341,6 +341,42 @@ async def liveness_check():
     return {"alive": True, "timestamp": datetime.now().isoformat()}
 
 
+@app.get("/api/debug/query-stats")
+async def get_query_stats():
+    """
+    Get database query performance statistics.
+    Only available in development mode.
+    """
+    if os.getenv("ENVIRONMENT", "development") == "production":
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="Not found")
+    
+    from middleware.profiling_middleware import get_profiler
+    profiler = get_profiler()
+    
+    stats = profiler.get_stats()
+    
+    return {
+        "query_stats": stats[:20],  # Top 20 slowest queries
+        "total_unique_queries": len(stats),
+        "timestamp": datetime.now().isoformat()
+    }
+
+
+@app.post("/api/debug/reset-query-stats")
+async def reset_query_stats():
+    """Reset query statistics. Only available in development mode."""
+    if os.getenv("ENVIRONMENT", "development") == "production":
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="Not found")
+    
+    from middleware.profiling_middleware import get_profiler
+    profiler = get_profiler()
+    profiler.reset_stats()
+    
+    return {"message": "Query statistics reset", "timestamp": datetime.now().isoformat()}
+
+
 # ============================================================================
 # Lifecycle Events (deprecated - using lifespan handler instead)
 # ============================================================================

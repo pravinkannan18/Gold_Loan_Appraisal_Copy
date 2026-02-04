@@ -215,29 +215,34 @@ class VideoTransformTrack(MediaStreamTrack):
     def _draw_overlay(self, img: np.ndarray, process_time: float):
         """Draw FPS and status overlay on frame"""
         height, width = img.shape[:2]
-        
-        # Draw semi-transparent background for stats
+        # Compute scale relative to frame width for stable sizing across resolutions
+        base_scale = 0.6
+        scale = max(0.45, min(1.2, base_scale * (width / 640)))
+
+        # Draw semi-transparent background for stats (size scales with resolution)
+        overlay_w = int(250 * (width / 640))
+        overlay_h = int(100 * (height / 480))
         overlay = img.copy()
-        cv2.rectangle(overlay, (10, 10), (250, 100), (0, 0, 0), -1)
+        cv2.rectangle(overlay, (10, 10), (10 + overlay_w, 10 + overlay_h), (0, 0, 0), -1)
         cv2.addWeighted(overlay, 0.6, img, 0.4, 0, img)
-        
-        # Draw text
+
+        # Draw text with consistent scaled font
         font = cv2.FONT_HERSHEY_SIMPLEX
-        cv2.putText(img, f"FPS: {self.fps:.1f}", (20, 35), font, 0.6, (0, 255, 0), 2)
-        cv2.putText(img, f"Process: {process_time:.1f}ms", (20, 60), font, 0.6, (0, 255, 0), 2)
-        cv2.putText(img, f"Task: {self.session.current_task}", (20, 85), font, 0.6, (0, 255, 255), 2)
+        cv2.putText(img, f"FPS: {self.fps:.1f}", (20, 30), font, scale, (0, 255, 0), max(1, int(2 * scale)))
+        cv2.putText(img, f"Process: {process_time:.1f}ms", (20, int(30 + 25 * scale)), font, scale, (0, 255, 0), max(1, int(2 * scale)))
+        cv2.putText(img, f"Task: {self.session.current_task}", (20, int(30 + 50 * scale)), font, scale, (0, 255, 255), max(1, int(2 * scale)))
         
         # Draw detection status
         status = self.session.detection_status
-        status_y = height - 60
+        status_y = height - int(60 * (height / 480))
         
         if status.get("rubbing_detected"):
-            cv2.putText(img, "✓ Rubbing OK", (20, status_y), font, 0.6, (0, 255, 0), 2)
+            cv2.putText(img, "Rubbing: OK", (20, status_y), font, scale, (0, 255, 0), max(1, int(2 * scale)))
         else:
-            cv2.putText(img, "○ Rubbing...", (20, status_y), font, 0.6, (255, 255, 0), 2)
-        
+            cv2.putText(img, "Rubbing: Pending", (20, status_y), font, scale, (255, 255, 0), max(1, int(2 * scale)))
+
         if status.get("acid_detected"):
-            cv2.putText(img, "✓ Acid OK", (20, status_y + 25), font, 0.6, (0, 255, 0), 2)
+            cv2.putText(img, "Acid: OK", (20, status_y + int(25 * scale)), font, scale, (0, 255, 0), max(1, int(2 * scale)))
     
     def _send_status_update(self):
         """Send status update via data channel"""

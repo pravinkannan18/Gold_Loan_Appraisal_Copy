@@ -1,6 +1,7 @@
 """
 Request Logging Middleware
 Logs all incoming requests with timing and response information
+Version: 2.1 - Fixed path consistency issue
 """
 import time
 import uuid
@@ -36,6 +37,9 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
         "/favicon.ico"
     }
     
+    # Class-level storage for original paths (keyed by request_id)
+    _original_paths: dict = {}
+    
     def __init__(self, app, log_body: bool = False, slow_threshold: float = 2.0):
         super().__init__(app)
         self.log_body = log_body
@@ -63,18 +67,22 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
         # Record start time
         start_time = time.time()
         
-        # Get request info
+        # Get request info (capture original path before any processing)
         client_ip = self._get_client_ip(request)
         method = request.method
-        path = request.url.path
+        # Capture the raw path from the ASGI scope to get the truly original request
+        original_path = request.scope.get("path", str(request.url.path))
         query = str(request.query_params) if request.query_params else ""
         
+        # Store original path in class-level dict (immutable storage)
+        RequestLoggingMiddleware._original_paths[request_id] = original_path
+        
         # Skip detailed logging for excluded paths
-        is_excluded = path in self.EXCLUDED_PATHS
+        is_excluded = original_path in self.EXCLUDED_PATHS
         
         if not is_excluded:
             logger.info(
-                f"[{request_id}] ➡️  {method} {path}"
+                f"[{request_id}] --> {method} {original_path}"
                 f"{f'?{query}' if query else ''} "
                 f"- Client: {client_ip}"
             )
@@ -91,19 +99,29 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
             response.headers["X-Request-ID"] = request_id
             response.headers["X-Response-Time"] = f"{duration_ms}ms"
             
-            # Log response
+            # Log response - retrieve original path from class storage
             status_code = response.status_code
-            status_emoji = "✅" if 200 <= status_code < 400 else "⚠️" if 400 <= status_code < 500 else "❌"
+            status_emoji = "[OK]" if 200 <= status_code < 400 else "[WARN]" if 400 <= status_code < 500 else "[ERR]"
+            
+            # Get original path from class-level storage (guaranteed immutable)
+            logged_path = RequestLoggingMiddleware._original_paths.pop(request_id, None)
+            current_url_path = str(request.url.path)
+            
+            # Use stored path, falling back to current if not found
+            if logged_path is None:
+                logged_path = current_url_path
+                logger.warning(f"[{request_id}] Path not found in storage, using current: {logged_path}")
             
             if not is_excluded:
+                # Use original path consistently for both request start and end logging
                 log_message = (
-                    f"[{request_id}] {status_emoji} {method} {path} "
+                    f"[{request_id}] {status_emoji} {method} {logged_path} "
                     f"- Status: {status_code} - Duration: {duration_ms}ms"
                 )
                 
                 # Log slow requests as warnings
                 if duration > self.slow_threshold:
-                    logger.warning(f"🐢 SLOW REQUEST: {log_message}")
+                    logger.warning(f"[SLOW] {log_message}")
                 elif status_code >= 500:
                     logger.error(log_message)
                 elif status_code >= 400:
@@ -114,6 +132,9 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
             return response
             
         except Exception as e:
+            # Clean up stored path on error
+            RequestLoggingMiddleware._original_paths.pop(request_id, None)
+            
             # Calculate duration even for errors
             duration = time.time() - start_time
             duration_ms = round(duration * 1000, 2)
@@ -124,13 +145,20 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
             # Remove common credential patterns FIRST (before truncation)
             import re
             # Match quoted strings (with spaces) or unquoted tokens
-            sanitized_msg = re.sub(r'(password|token|secret|api_key|apikey|auth)(["\']?\s*[:=]\s*)(("[^"]*")|(\\'[^\\']*\\')|([^\s,;"\'}\]]+))', '\\1\\2***REDACTED***', error_msg, flags=re.IGNORECASE)
+            # Pattern: key + delimiter + (double-quoted | single-quoted | unquoted value)
+            sanitized_msg = re.sub(
+                r"(password|token|secret|api_key|apikey|auth)([\"']?\s*[:=]\s*)"
+                r"(\"[^\"]*\"|'[^']*'|[^\s,;\"'}\]]+)",
+                r'\1\2***REDACTED***',
+                error_msg,
+                flags=re.IGNORECASE
+            )
             sanitized_msg = sanitized_msg.replace('\n', ' ').replace('\r', '')
             # Truncate after redaction to ensure secrets aren't leaked
             sanitized_msg = sanitized_msg[:200] if len(sanitized_msg) > 200 else sanitized_msg
             
             logger.error(
-                f"[{request_id}] ❌ {method} {path} "
+                f"[{request_id}] ❌ {method} {original_path} "
                 f"- Error: {error_type}: {sanitized_msg} "
                 f"- Duration: {duration_ms}ms"
             )

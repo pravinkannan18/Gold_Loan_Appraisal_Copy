@@ -612,23 +612,33 @@ class Database:
                         CREATE INDEX IF NOT EXISTS idx_overall_sessions_tenant_user ON overall_sessions(tenant_user_id);
                     END IF;
                     
-                    -- Create indexes for other tables (these should have the columns)
+                    -- Create session_id indexes for detail tables (critical for JOIN performance)
                     IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name='appraiser_details') THEN
+                        CREATE INDEX IF NOT EXISTS idx_appraiser_details_session_id ON appraiser_details(session_id);
                         CREATE INDEX IF NOT EXISTS idx_appraiser_details_bank_id ON appraiser_details(bank_id);
                         CREATE INDEX IF NOT EXISTS idx_appraiser_details_tenant_user ON appraiser_details(tenant_user_id);
                     END IF;
                     
                     IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name='customer_details') THEN
+                        CREATE INDEX IF NOT EXISTS idx_customer_details_session_id ON customer_details(session_id);
                         CREATE INDEX IF NOT EXISTS idx_customer_details_bank_id ON customer_details(bank_id);
                     END IF;
                     
                     IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name='rbi_compliance_details') THEN
+                        CREATE INDEX IF NOT EXISTS idx_rbi_compliance_session_id ON rbi_compliance_details(session_id);
                         CREATE INDEX IF NOT EXISTS idx_rbi_compliance_bank_id ON rbi_compliance_details(bank_id);
                     END IF;
                     
                     IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name='purity_test_details') THEN
+                        CREATE INDEX IF NOT EXISTS idx_purity_test_session_id ON purity_test_details(session_id);
                         CREATE INDEX IF NOT EXISTS idx_purity_test_bank_id ON purity_test_details(bank_id);
                     END IF;
+                    
+                    -- Create composite indexes for common query patterns
+                    CREATE INDEX IF NOT EXISTS idx_overall_sessions_status_created 
+                        ON overall_sessions(status, created_at DESC);
+                    CREATE INDEX IF NOT EXISTS idx_overall_sessions_bank_branch 
+                        ON overall_sessions(bank_id, branch_id);
                 END $$;
             ''')
             
@@ -1570,60 +1580,101 @@ class Database:
         return True
 
     def get_session(self, session_id: str) -> Optional[Dict[str, Any]]:
+        """Get session data with all related details in a single optimized query.
+        
+        Uses LEFT JOINs with DISTINCT ON to fetch all related data in one round-trip,
+        reducing from 4 queries to 1 for significant performance improvement.
+        """
         conn = self.get_connection()
         cursor = conn.cursor(cursor_factory=RealDictCursor)
         try:
-            cursor.execute("SELECT * FROM overall_sessions WHERE session_id = %s", (session_id,))
-            overall = cursor.fetchone()
-            if not overall:
+            # Single optimized query with LEFT JOINs and subqueries for latest records
+            cursor.execute("""
+                SELECT 
+                    os.*,
+                    cd.customer_image,
+                    rbi.overall_images AS rbi_overall_images,
+                    rbi.item_images AS rbi_item_images,
+                    rbi.total_items AS rbi_total_items,
+                    pt.results AS purity_results,
+                    pt.total_items AS purity_total_items
+                FROM overall_sessions os
+                LEFT JOIN LATERAL (
+                    SELECT customer_image 
+                    FROM customer_details 
+                    WHERE session_id = os.session_id 
+                    ORDER BY created_at DESC 
+                    LIMIT 1
+                ) cd ON true
+                LEFT JOIN LATERAL (
+                    SELECT overall_images, item_images, total_items 
+                    FROM rbi_compliance_details 
+                    WHERE session_id = os.session_id 
+                    ORDER BY created_at DESC 
+                    LIMIT 1
+                ) rbi ON true
+                LEFT JOIN LATERAL (
+                    SELECT results, total_items 
+                    FROM purity_test_details 
+                    WHERE session_id = os.session_id 
+                    ORDER BY created_at DESC 
+                    LIMIT 1
+                ) pt ON true
+                WHERE os.session_id = %s
+            """, (session_id,))
+            
+            row = cursor.fetchone()
+            if not row:
                 return None
-            result = dict(overall)
             
-            cursor.execute("SELECT customer_image FROM customer_details WHERE session_id = %s ORDER BY created_at DESC LIMIT 1", (session_id,))
-            cust = cursor.fetchone()
-            if cust:
-                result['customer_front_image'] = cust['customer_image']
+            result = dict(row)
             
-            cursor.execute("SELECT * FROM rbi_compliance_details WHERE session_id = %s ORDER BY created_at DESC LIMIT 1", (session_id,))
-            rbi = cursor.fetchone()
-            if rbi:
-                # Always set total_items first (integer, no parsing needed)
-                result['total_items'] = rbi['total_items'] or 0
-                
-                # Parse JSON fields separately with individual error handling
-                try:
-                    result['rbi_compliance'] = {
-                        'overall_images': json.loads(rbi['overall_images']) if rbi['overall_images'] else [],
-                        'total_items': rbi['total_items'] or 0
-                    }
-                except (json.JSONDecodeError, TypeError) as e:
-                    print(f"Warning: Failed to parse overall_images: {e}")
-                    result['rbi_compliance'] = {'overall_images': [], 'total_items': rbi['total_items'] or 0}
-                
-                try:
-                    result['jewellery_items'] = json.loads(rbi['item_images']) if rbi['item_images'] else []
-                except (json.JSONDecodeError, TypeError) as e:
-                    print(f"Warning: Failed to parse item_images: {e}")
-                    result['jewellery_items'] = []
-
-            cursor.execute("SELECT results, total_items FROM purity_test_details WHERE session_id = %s ORDER BY created_at DESC LIMIT 1", (session_id,))
-            pure = cursor.fetchone()
-            if pure:
-                try:
-                    result['purity_results'] = json.loads(pure['results']) if pure['results'] else {}
-                except (json.JSONDecodeError, TypeError) as e:
-                    print(f"Warning: Failed to parse purity_results: {e}")
-                    result['purity_results'] = {}
+            # Process customer image
+            if result.get('customer_image'):
+                result['customer_front_image'] = result.pop('customer_image')
+            else:
+                result.pop('customer_image', None)
             
+            # Process RBI compliance data
+            rbi_total_items = result.pop('rbi_total_items', None) or 0
+            rbi_overall_images = result.pop('rbi_overall_images', None)
+            rbi_item_images = result.pop('rbi_item_images', None)
+            
+            result['total_items'] = rbi_total_items
+            
+            try:
+                result['rbi_compliance'] = {
+                    'overall_images': json.loads(rbi_overall_images) if rbi_overall_images else [],
+                    'total_items': rbi_total_items
+                }
+            except (json.JSONDecodeError, TypeError):
+                result['rbi_compliance'] = {'overall_images': [], 'total_items': rbi_total_items}
+            
+            try:
+                result['jewellery_items'] = json.loads(rbi_item_images) if rbi_item_images else []
+            except (json.JSONDecodeError, TypeError):
+                result['jewellery_items'] = []
+            
+            # Process purity results
+            purity_results_raw = result.pop('purity_results', None)
+            result.pop('purity_total_items', None)
+            
+            try:
+                result['purity_results'] = json.loads(purity_results_raw) if purity_results_raw else {}
+            except (json.JSONDecodeError, TypeError):
+                result['purity_results'] = {}
+            
+            # Build appraiser_data from overall session
             result['appraiser_data'] = {
-                'name': overall['name'],
-                'id': overall['appraiser_id'],
-                'bank': overall['bank'],
-                'branch': overall['branch'],
-                'email': overall['email'],
-                'phone': overall['phone'],
-                'image': overall['image_data']
+                'name': result.get('name'),
+                'id': result.get('appraiser_id'),
+                'bank': result.get('bank'),
+                'branch': result.get('branch'),
+                'email': result.get('email'),
+                'phone': result.get('phone'),
+                'image': result.get('image_data')
             }
+            
             return result
         finally:
             cursor.close()
