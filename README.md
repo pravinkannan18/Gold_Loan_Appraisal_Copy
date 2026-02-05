@@ -6,153 +6,115 @@ This document provides a visual guide to the new production-level backend struct
 
 ---
 
-## Directory Tree
 
+
+# Purity Testing Diagrams
+
+These diagrams describe the purity testing workflow and the tech stack used in this project.
+
+## Purity Testing Workflow (End-to-End)
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant UI as Frontend (Web)
+    participant API as FastAPI Backend
+    participant RTC as WebRTC Manager
+    participant VP as Video Processor
+    participant INF as Inference Worker
+    participant MM as Model Manager
+    participant DB as PostgreSQL
+
+    UI->>API: POST /api/webrtc/offer or /api/webrtc/session/create
+    API->>RTC: create_session()
+    RTC-->>UI: session_id + (answer if WebRTC)
+
+    UI->>RTC: Video stream (WebRTC) or frames (WebSocket fallback)
+    RTC->>VP: VideoTransformTrack(recv)
+    VP->>INF: process_frame(frame, current_task)
+    INF->>MM: predict(stone)
+    INF->>MM: predict(gold)
+    INF-->>VP: rubbing_detected + stage
+
+    VP-->>RTC: queue task switch (rubbing -> acid)
+    RTC-->>UI: status updates (data channel)
+
+    VP->>INF: process_frame(frame, current_task=acid)
+    INF->>MM: predict(acid)
+    INF-->>VP: acid_detected + gold_purity + stage
+    RTC-->>UI: status updates (data channel)
+
+    UI->>API: POST /api/session/{id}/purity-test (results)
+    API->>DB: INSERT purity_test_details
+    DB-->>API: OK
+    API-->>UI: Purity test saved
 ```
-backend/
-│
-├── 📄 main.py                      # ← Entry point (minimal, imports from app.main)
-├── 📄 requirements.txt             # Python dependencies
-├── 📄 .env                         # Environment variables (gitignored)
-├── 📄 .env.example                 # Environment template
-├── 📄 Dockerfile                   # Docker configuration
-├── 📄 docker-compose.yml           # Production deployment setup
-├── 📄 alembic.ini                  # Database migration configuration
-├── 📄 pytest.ini                   # Testing configuration
-├── 📄 README.md                    # Project documentation
-│
-├── 📦 app/                         # ← MAIN APPLICATION PACKAGE
-│   │
-│   ├── 📄 __init__.py
-│   ├── 📄 main.py                  # FastAPI app factory
-│   │
-│   ├── 🎯 api/                     # API Layer (HTTP endpoints)
-│   │   ├── 📄 __init__.py
-│   │   ├── 📄 deps.py              # Dependency injection functions
-│   │   │
-│   │   └── 📁 v1/                  # API Version 1
-│   │       ├── 📄 __init__.py
-│   │       ├── 📄 router.py        # Main router aggregator
-│   │       │
-│   │       └── 📁 endpoints/       # All API endpoints
-│   │           ├── 📄 __init__.py
-│   │           ├── 🔐 auth.py      # Authentication (login, logout, refresh)
-│   │           ├── 👨‍💼 admin.py     # Admin operations (banks, branches)
-│   │           ├── 👤 appraisers.py # Appraiser management
-│   │           ├── 📋 appraisals.py # Appraisal CRUD operations
-│   │           ├── 🗂️ sessions.py   # Session management
-│   │           ├── 📸 camera.py     # Camera operations
-│   │           ├── 😀 face.py       # Facial recognition
-│   │           ├── 📍 gps.py        # GPS location services
-│   │           ├── 🏷️ classification.py # Jewellery classification
-│   │           └── 📹 webrtc.py     # WebRTC streaming
-│   │
-│   ├── ⚙️ core/                    # Core application configuration
-│   │   ├── 📄 __init__.py
-│   │   ├── 📄 config.py            # Centralized configuration (Pydantic Settings)
-│   │   ├── 🔒 security.py          # JWT, password hashing, device fingerprinting
-│   │   ├── ⚠️ exceptions.py        # Custom exception classes
-│   │   ├── 📝 logging.py           # Logging configuration
-│   │   └── 📄 constants.py         # Application constants
-│   │
-│   ├── 🔐 middleware/              # Request/Response middleware
-│   │   ├── 📄 __init__.py
-│   │   ├── 🔑 auth.py              # JWT authentication middleware
-│   │   ├── 🏢 tenant.py            # Tenant context extraction
-│   │   ├── ❌ error_handler.py     # Global error handling
-│   │   └── 📝 logging.py           # Request logging
-│   │
-│   ├── 💾 models/                  # Data models & database
-│   │   ├── 📄 __init__.py
-│   │   ├── 🗄️ database.py          # PostgreSQL operations
-│   │   └── 🏢 tenant_context.py    # Tenant context manager
-│   │
-│   ├── 📋 schemas/                 # Pydantic data validation schemas
-│   │   ├── 📄 __init__.py
-│   │   ├── 📄 base.py              # Base schemas
-│   │   ├── 🏦 tenant.py            # Bank, Branch, Device schemas
-│   │   ├── 🔐 auth.py              # Login, Token, Refresh schemas
-│   │   ├── 👤 appraiser.py         # Appraiser data schemas
-│   │   ├── 📋 appraisal.py         # Appraisal data schemas
-│   │   ├── 🗂️ session.py           # Session data schemas
-│   │   ├── 👨‍👩‍👧 customer.py         # Customer data schemas
-│   │   ├── 📜 rbi.py               # RBI compliance schemas
-│   │   ├── 🧪 purity.py            # Purity test schemas
-│   │   └── 📄 common.py            # Shared/common schemas
-│   │
-│   ├── 💼 services/                # Business logic services
-│   │   ├── 📄 __init__.py
-│   │   ├── 🔐 auth_service.py      # Authentication logic
-│   │   ├── 👨‍💼 admin_service.py     # Admin operations
-│   │   ├── 🏢 tenant_service.py    # Tenant management
-│   │   ├── 👤 appraiser_service.py # Appraiser business logic
-│   │   ├── 📋 appraisal_service.py # Appraisal business logic
-│   │   ├── 📜 audit_service.py     # Immutable audit logging
-│   │   ├── 🗄️ evidence_service.py  # Evidence file storage
-│   │   ├── 📸 camera_service.py    # Camera operations
-│   │   ├── 😀 facial_recognition_service.py # Face recognition
-│   │   ├── 🏷️ classification_service.py # Jewellery classification
-│   │   └── 📍 gps_service.py       # GPS location
-│   │
-│   ├── 🤖 ai/                      # AI/ML components
-│   │   ├── 📄 __init__.py
-│   │   │
-│   │   ├── 📁 inference/           # AI inference logic
-│   │   │   ├── 📄 __init__.py
-│   │   │   ├── 🔍 inference_worker.py # Purity testing worker
-│   │   │   └── 📦 model_manager.py # Model loading/caching
-│   │   │
-│   │   └── 📁 models/              # ML model files
-│   │       ├── 📄 __init__.py
-│   │       ├── 📁 yolo/            # YOLO detection models
-│   │       │   ├── best_rub2_1.pt  # Acid test model
-│   │       │   └── best_rub2_2.pt  # Rubbing test model
-│   │       └── 📁 classification/ # Classification models
-│   │           ├── resnet50_local.pth # ResNet50 model
-│   │           └── class_names.json   # Class labels
-│   │
-│   ├── 📹 webrtc/                  # WebRTC video streaming
-│   │   ├── 📄 __init__.py
-│   │   ├── 📡 signaling.py         # WebRTC signaling server
-│   │   └── 🎥 video_processor.py   # Video transformation track
-│   │
-│   └── 🔧 utils/                   # Utility functions
-│       ├── 📄 __init__.py
-│       ├── 🛠️ helpers.py            # General helpers
-│       ├── ✅ validators.py         # Custom validators
-│       └── 📊 formatters.py        # Data formatters
-│
-├── 📊 migrations/                  # Database migrations (Alembic)
-│   ├── 📁 versions/
-│   │   ├── 001_tenant_schema.py
-│   │   ├── 002_row_level_security.py
-│   │   └── 003_performance_indexes.py
-│   ├── 📄 env.py
-│   └── 📄 script.py.mako
-│
-├── ✅ tests/                       # Automated tests
-│   ├── 📄 __init__.py
-│   ├── 📄 conftest.py              # Pytest configuration
-│   ├── 📁 unit/                    # Unit tests
-│   │   ├── test_services/
-│   │   ├── test_models/
-│   │   └── test_utils/
-│   ├── 📁 integration/             # Integration tests
-│   │   ├── test_api/
-│   │   ├── test_auth/
-│   │   └── test_tenant_isolation/
-│   └── 📁 fixtures/
-│       └── test_data.py
-│
-├── 🔨 scripts/                     # Utility scripts
-│   ├── 💾 seed_database.py         # Database seeding
-│   ├── 👨‍💼 create_admin.py          # Create admin user
-│   └── 🔄 migrate_old_data.py      # Data migration
-│
-└── 📁 data/                        # Data files
-    ├── task_sequence.csv
-    └── task_sequence_main.csv
+
+## Inference Pipeline (Rubbing -> Acid)
+
+```mermaid
+flowchart TD
+    A["Frame In"] --> B{"Current Task"}
+    B -->|rubbing| C["Stone Detection YOLO"]
+    C --> D["Gold Detection YOLO (ROI)"]
+    D --> E["Gold Mask Persistence"]
+    E --> F["Rubbing Motion (distance fluctuation)"]
+    F --> G{"Visual OK? (>=3)"}
+    G -->|No| H["Stay in RUBBING"]
+    G -->|Yes| I["Switch to ACID"]
+
+    B -->|acid| J["Acid Detection YOLO"]
+    J --> K{"Acid Found?"}
+    K -->|Yes| L["Parse Purity (18K/22K/24K)"]
+    K -->|No| M["Stay in ACID"]
+    L --> N["Mark COMPLETED"]
+
+    H --> B
+    I --> B
+    M --> B
 ```
+
+## Tech Stack Overview
+
+```mermaid
+flowchart LR
+    subgraph Frontend
+        FE1[React 18]
+        FE2[Vite]
+        FE3[TypeScript]
+        FE4[Tailwind + Radix UI]
+        FE5[Axios + React Query]
+    end
+
+    subgraph Backend
+        BE1[FastAPI]
+        BE2[Uvicorn]
+        BE3[WebRTC: aiortc/av]
+        BE4[AI: Ultralytics YOLO]
+        BE5[CV: OpenCV + NumPy]
+        BE6[PyTorch]
+    end
+
+    subgraph Data
+        DB1[PostgreSQL]
+    end
+
+    FE1 -->|HTTP/REST| BE1
+    FE1 -->|WebRTC/WebSocket| BE3
+    BE1 --> DB1
+    BE4 --> BE6
+    BE5 --> BE4
+```
+
+## Purity Data Persistence
+
+```mermaid
+flowchart TD
+    S["Session: /api/session/{id}"] --> P["POST /api/session/{id}/purity-test"]
+    P --> DB[("purity_test_details")]
+    DB --> ST["overall_sessions.status = purity_completed"]
+```
+
 
 ---
 
